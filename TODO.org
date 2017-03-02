@@ -1,0 +1,21 @@
+
+* SSE basics
+** core protocol handling
+** messages routing
+** retry negotiation
+** origin tracking
+** errors routing
+** open, close routing
+** add event channel
+
+** Optional features:
+*** reader support
+*** buffering selection
+*** context cancellation
+*** relative URLs
+*** POST support
+*** no connect on create
+
+* Test strategies
+** "service layer" testing - reader in, events out
+** in-process basic server tests
