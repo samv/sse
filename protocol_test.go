@@ -3,6 +3,7 @@ package sse
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -33,10 +34,12 @@ func AssertEmitsEvents(t *testing.T, expected []*Event, stream []byte, groupLabe
 	idx := 0
 	for yielded := range eventChan {
 		eventNum := fmt.Sprintf("%s, event #%d", groupLabel, idx+1)
+		fmt.Printf("read event #%d: %+v (%v)\n", idx+1, yielded, strconv.Quote(string(yielded.Data)))
 		if assert.NotNil(t, yielded, eventNum) {
 			if assert.True(t, idx < len(expected), eventNum+" (no extra events)") {
 				assert.Equal(t, dummyOrigin, yielded.Origin, eventNum)
 				expected := expected[idx]
+				fmt.Printf("expecting: %+v (%v)\n", expected, strconv.Quote(string(expected.Data)))
 				assert.Equal(t, string(expected.Data), string(yielded.Data), eventNum)
 				assert.Equal(t, expected.Type, yielded.Type, eventNum)
 				assert.Equal(t, expected.LastEventId, yielded.LastEventId, eventNum)
