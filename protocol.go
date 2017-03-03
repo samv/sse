@@ -3,6 +3,7 @@ package sse
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"strconv"
 	"time"
@@ -75,7 +76,6 @@ func (decoder *eventStreamReader) decode(events chan<- *Event) error {
 				Data:    eventData,
 				Type:    eventName,
 			}
-
 			Logger.Printf("writing an event to %v: %+v", events, event)
 			events <- event
 		}
