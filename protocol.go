@@ -3,6 +3,7 @@ package sse
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"strconv"
 	"time"
@@ -72,6 +73,7 @@ func (decoder *EventStreamReader) decode(events chan<- *Event) error {
 				Data:        eventData,
 				Type:        eventName,
 			}
+			fmt.Printf("emitting: %+v (%v)\n", event, strconv.Quote(string(data)))
 			events <- event
 		}
 		eventName = ""
@@ -82,6 +84,9 @@ func (decoder *EventStreamReader) decode(events chan<- *Event) error {
 	// follows:
 	for scanner.Scan() {
 		token := scanner.Bytes()
+		fmt.Printf("scanned: %v; data = %v, eventName = %v\n",
+			strconv.Quote(string(token)), strconv.Quote(data.String()),
+			strconv.Quote(eventName))
 		switch {
 		case bytes.Equal(token, EndOfLine):
 			// If the line is empty (a blank line)
