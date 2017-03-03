@@ -26,6 +26,7 @@
 *** TODO context cancellation
 *** TODO buffering selection
 *** POST support
+*** bad stream detection
 *** no connect on create
 *** support for unusual HTTP responses (30x, 401 etc)
 
