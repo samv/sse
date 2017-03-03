@@ -1,6 +1,9 @@
 
 * SSE basics
-** core protocol handling
+** TODO core protocol handling
+*** DONE text/event-stream decoding
+*** event stream protocol state
+*** client connection
 ** messages routing
 ** retry negotiation
 ** origin tracking
