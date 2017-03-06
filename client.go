@@ -59,6 +59,10 @@ type SSEClient struct {
 	reconnect     bool
 	reconnectTime time.Duration
 
+	// SSE state
+	// reconnect time after losing connection
+	lastEventId string // sticky
+
 	canceler
 
 	// channels for these "standard" messages
@@ -116,7 +120,12 @@ func (ssec *SSEClient) makeRequest() (*http.Request, error) {
 	}
 	request = ssec.wrapRequest(request)
 
+	request := req
+
 	request.Header.Set("Accept", "text/event-stream")
+	if ssec.lastEventId != "" {
+		request.Header.Set("Last-Event-Id", ssec.lastEventId)
+	}
 	return request, nil
 }
 

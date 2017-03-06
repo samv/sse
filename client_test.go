@@ -279,4 +279,5 @@ func TestClientError(t *testing.T) {
 //  "reconnect" cases -
 //    * reconnects by default
 //    * with a negotiated retry
+//    * with a last-event-id
 //    * client watching for "closed"
