@@ -17,6 +17,11 @@ import (
 type ReadyState int32
 
 const (
+	// bitwise flags for selecting which events to pass through
+	wantErrors    = 1
+	wantOpenClose = 2
+	wantMessages  = 4
+
 	// ReadyState is an enum representing the current status of the connection
 	Connecting ReadyState = 0
 	Open       ReadyState = 1
@@ -46,11 +51,25 @@ type SSEClient struct {
 	reader      *StreamEventReader
 	readerError error
 	eventStream chan *Event
+
+	// reconnect time after losing connection
+	// what messages are being sent through
+	wantStd int32
+
+	// channels for these "standard" messages
+	messagesChan chan *Event // standard message channel
+	opensChan    chan bool   // open/close notification channel
+	errorsChan   chan *Event // error channel
 }
 
 // NewSSEClient creates a new client which can make a single SSE call.
 func NewSSEClient() *SSEClient {
 	ssec := &SSEClient{
+		readyState: Connecting,
+		eventChan:  make(chan *Event, 1),
+		onlineChan: make(chan bool, 1),
+		errorChan:  make(chan error, 1),
+		want:       wantMessages,
 		readyState: Connecting,
 	}
 	return ssec
@@ -128,6 +147,32 @@ func (ssec *SSEClient) connect() error {
 	// TODO: reset the connection here if error
 
 	return err
+}
+
+func (ssec *SSEClient) want(what int32) {
+	if (atomic.LoadInt32(&ssec.wantStd) & what) == 0 {
+		// seems silly to use both atomic load and mutex, but this is
+		// a read, modify, update, and the fastpath is lockless atomic read
+		ssec.Lock()
+		wants := atomic.LoadInt32(&ssec.wantStd) | what
+		atomic.StoreInt32(&ssec.wantStd, what)
+		ssec.Unlock()
+	}
+}
+
+func (ssec *SSEClient) Messages() <-chan *Event {
+	ssec.want(wantMessages)
+	return ssec.messagesChan
+}
+
+func (ssec *SSEClient) Opens() <-chan bool {
+	ssec.want(wantOpens)
+	return ssec.opensChan
+}
+
+func (ssec *SSEClient) Errors() <-chan *Event {
+	ssec.want(wantErrors)
+	return ssec.errorsChan
 }
 
 // URL returns the configured URL of the client
