@@ -102,6 +102,13 @@ func NewSSEClient(options ...ConfigOption) *SSEClient {
 	return ssec
 }
 
+// SetBaseURL allows the main URL passed in to be a relative URL.
+func (ssec *SSEClient) SetBaseURL(uri string) error {
+	var err error
+	ssec.baseURL, err = url.Parse(uri)
+	return err
+}
+
 // GetStream makes a GET request and returns a channel for *all* events read
 func (ssec *SSEClient) GetStream(uri string) error {
 	ssec.Lock()
