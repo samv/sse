@@ -53,6 +53,7 @@ type SSEClient struct {
 	eventStream chan *Event
 
 	// SSE state
+	origin      string // pre-packaged origin value for events
 	// reconnect time after losing connection
 	lastEventId string // sticky
 	// what messages are being sent through
