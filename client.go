@@ -89,6 +89,13 @@ func NewSSEClient() *SSEClient {
 	return ssec
 }
 
+// SetBaseURL allows the main URL passed in to be a relative URL.
+func (ssec *SSEClient) SetBaseURL(uri string) error {
+	var err error
+	ssec.baseURL, err = url.Parse(uri)
+	return err
+}
+
 // GetStream makes a GET request and returns a channel for *all* events read
 func (ssec *SSEClient) GetStream(uri string) error {
 	ssec.Lock()
@@ -282,12 +289,11 @@ func (ssec *SSEClient) emitError(err error) {
 	ssec.emit(packagedError)
 }
 
-// URL returns the configured URL of the client
-func (ssec *SSEClient) URL() *net.URL {
+// URL returns the configured URL of the client, which may have an error
+func (ssec *SSEClient) URL() (*net.URL, error) {
 	ssec.Lock()
-	retUrl := ssec.uri
-	ssec.Unlock()
-	return retUrl
+	defer ssec.Unlock()
+	return url.Parse(ssec.uri)
 }
 
 func (ssec *SSEClient) readStream() {
