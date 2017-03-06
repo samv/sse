@@ -166,6 +166,27 @@ func (ssec *SSEClient) Messages() <-chan *Event {
 }
 
 func (ssec *SSEClient) emit(event *Event) {
+	// only send "message" events down the Messages() channel
+	switch event.Type {
+	case MessageType:
+		if (atomic.LoadInt32(&ssec.wantStd) & wantMessages) == 0 {
+			select {
+			case ssec.messagesChan <- event:
+			default:
+			}
+		} else {
+			ssec.messagesChan <- event
+		}
+	case ErrorType:
+		if (atomic.LoadInt32(&ssec.wantStd) & wantErrors) == 0 {
+			select {
+			case ssec.errorsChan <- event:
+			default:
+			}
+		} else {
+			ssec.errorsChan <- event
+		}
+	}
 }
 
 func (ssec *SSEClient) Opens() <-chan bool {
@@ -174,6 +195,14 @@ func (ssec *SSEClient) Opens() <-chan bool {
 }
 
 func (ssec *SSEClient) emitOpenClose(which bool) {
+	if (atomic.LoadInt32(&ssec.wantStd) & wantOpens) == 0 {
+		select {
+		case ssec.opensChan <- which:
+		default:
+		}
+	} else {
+		ssec.opensChan <- which
+	}
 }
 
 func (ssec *SSEClient) Errors() <-chan *Event {
@@ -229,4 +258,6 @@ func (ssec *SSEClient) process() {
 			}
 		}
 	}
+
+	close(ssec.messagesChan)
 }
