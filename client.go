@@ -53,7 +53,7 @@ type SSEClient struct {
 	eventStream chan *Event
 
 	// SSE state
-	origin      string // pre-packaged origin value for events
+	origin string // pre-packaged origin value for events
 	// reconnect time after losing connection
 	lastEventId string // sticky
 
@@ -65,7 +65,8 @@ type SSEClient struct {
 	opensChan    chan bool   // open/close notification channel
 	errorsChan   chan *Event // error channel
 
-	// reconnect time after losing connection
+	// whether to reconnect and after what time
+	reconnect     bool
 	reconnectTime time.Duration
 }
 
@@ -160,6 +161,12 @@ func (ssec *SSEClient) connect() error {
 	// TODO: reset the connection here if error
 
 	return err
+}
+
+func (ssec *SSEClient) setReconnect(should bool) {
+	ssec.Lock()
+	ssec.reconnect = false
+	ssec.Unlock()
 }
 
 func (ssec *SSEClient) want(what int32) {
