@@ -60,6 +60,7 @@ type SSEClient struct {
 	reconnectTime time.Duration
 
 	// SSE state
+	origin      string // pre-packaged origin value for events
 	// reconnect time after losing connection
 	lastEventId string // sticky
 
