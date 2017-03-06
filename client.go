@@ -71,6 +71,9 @@ type SSEClient struct {
 	messageChan chan *Event // standard message channel
 	openChan    chan bool   // open/close notification channel
 	errorChan   chan error  // error channel
+
+	// 2. explicitly subscribed events
+	wantTypes map[string]chan<- *Event
 }
 
 // NewSSEClient creates a new client which can make a single SSE call.
@@ -222,6 +225,12 @@ func (ssec *SSEClient) demand(what WantFlag) {
 	}
 }
 
+func (ssec *SSEClient) addEventChannel(eventType string, eventChan chan<- *Event) {
+	ssec.Lock()
+	ssec.wantTypes[messageType] = eventChan
+	ssec.Unlock()
+}
+
 // Messages returns a channel from which events can be read
 func (ssec *SSEClient) Messages() <-chan *Event {
 	ssec.demand(WantMessages)
@@ -238,6 +247,17 @@ func (ssec *SSEClient) emit(event *Event) {
 	case ErrorType:
 	default:
 	}
+	// always send to explicitly configured channels
+	if sendChan := ssec.getEmitChan(event.Type); sendChan != nil {
+		sendChan <- event
+	}
+}
+
+func (ssec *SSEClient) getEmitChan(eventType string) <-chan *Event {
+	ssec.Lock()
+	rchan := ssec.wantTypes[eventType]
+	ssec.Unlock()
+	return rchan
 }
 
 // Opens returns a channel from which open/close notifications can be
