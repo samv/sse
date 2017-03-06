@@ -275,6 +275,7 @@ func TestClientError(t *testing.T) {
 //    * client reading just messages
 //    * client watching errors
 //    * client watching for "open"
+//    * server sends keepalives
 
 //  "reconnect" cases -
 //    * reconnects by default
