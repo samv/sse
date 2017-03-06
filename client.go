@@ -165,14 +165,23 @@ func (ssec *SSEClient) Messages() <-chan *Event {
 	return ssec.messagesChan
 }
 
+func (ssec *SSEClient) emit(event *Event) {
+}
+
 func (ssec *SSEClient) Opens() <-chan bool {
 	ssec.want(wantOpens)
 	return ssec.opensChan
 }
 
+func (ssec *SSEClient) emitOpenClose(which bool) {
+}
+
 func (ssec *SSEClient) Errors() <-chan *Event {
 	ssec.want(wantErrors)
 	return ssec.errorsChan
+}
+
+func (ssec *SSEClient) emitError(err error) {
 }
 
 // URL returns the configured URL of the client
@@ -196,6 +205,7 @@ func (ssec *SSEClient) process() {
 			err := ssec.connect()
 			if err != nil {
 				ssec.StoreInt32(&ssec.readyState, Closed)
+				ssec.emitError(err)
 				break
 			} else {
 				atomic.StoreInt32(&ssec.readyState, Open)
@@ -207,6 +217,8 @@ func (ssec *SSEClient) process() {
 			if !ok {
 				ssec.response.Body.Close()
 				ssec.response = nil
+			} else {
+				ssec.emit(event)
 			}
 		}
 	}
