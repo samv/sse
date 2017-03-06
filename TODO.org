@@ -14,7 +14,7 @@
 **** last-event-id tracking
 ** EventSource API
 *** add event channel
-*** messages routing
+*** TODO messages routing
 *** open message routing
 *** TODO errors routing
 *** add event listener
