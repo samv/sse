@@ -44,6 +44,11 @@ type SSEClient struct {
 	url    *url.URL
 	origin string
 
+	// for non-compliant clients
+	verb    string
+	body    io.ReadSeeker
+	headers http.Header
+
 	// current state of the client
 	readyState int32
 
@@ -132,12 +137,35 @@ func (ssec *SSEClient) SetContext(ctx context.Context) {
 }
 
 // GetStream makes a GET request and returns a channel for *all* events read
-func (ssec *SSEClient) GetStream(uri string) error {
+func (ssec *SSEClient) GetStream(uri string) (<-chan Event, error) {
+	if err := ssec.SetStreamRequest("GET", uri, nil, nil); err != nil {
+		return nil, err
+	}
+	return ssec.stream()
+}
+
+// PostStream makes a POST request and returns a channel for *all*
+// events read.  Note: it is not possible to do this in browsers
+// without special re-implementations of EventSource and IE polyfill
+func (ssec *SSEClient) PostStream(uri string, body io.ReadSeeker, headers http.Header) (<-chan Event, error) {
+	if err := ssec.SetStreamRequest("POST", uri, body, headers); err != nil {
+		return nil, err
+	}
+	return ssec.stream()
+}
+
+// SetStreamRequest allows the request for the next reconnection to be
+// altered
+func (ssec *SSEClient) SetStreamRequest(method, uri string, body io.ReadSeeker, headers http.Header) error {
 	ssec.Lock()
 	defer ssec.Unlock()
+	ssec.verb = method
+	ssec.body = body
+	ssec.headers = headers
 	var err error
-	if ssec.url, err = url.Parse(uri); err != nil {
-		return errors.Wrap(err, "error parsing URL")
+	ssec.url, err = url.Parse(uri)
+	if err == nil && ssec.baseURL != nil {
+		ssec.url = ssec.baseURL.ResolveReference(ssec.url)
 	}
 	ssec.wg.Add(1)
 	go ssec.process()
@@ -147,7 +175,7 @@ func (ssec *SSEClient) GetStream(uri string) error {
 func (ssec *SSEClient) makeRequest() (*http.Request, error) {
 	ssec.Lock()
 	defer ssec.Unlock()
-	request, err := http.NewRequest("GET", ssec.url.String(), nil)
+	request, err := http.NewRequest(ssec.verb, ssec.uri, ssec.body)
 	if err != nil {
 		return nil, err
 	}
@@ -155,6 +183,10 @@ func (ssec *SSEClient) makeRequest() (*http.Request, error) {
 
 	request := req
 
+	for header, vals := range ssec.headers {
+		request.Header[header] = vals
+	}
+	return nil
 	request.Header.Set("Accept", "text/event-stream")
 	if ssec.lastEventId != "" {
 		request.Header.Set("Last-Event-Id", ssec.lastEventId)
