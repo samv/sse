@@ -9,13 +9,14 @@
 **** TODO connection
 **** TODO reconnection
 **** retry negotiation
+**** TODO connection errors
 **** origin tracking
 **** last-event-id tracking
 ** EventSource API
 *** add event channel
 *** messages routing
 *** open message routing
-*** errors routing
+*** TODO errors routing
 *** add event listener
 
 ** Optional features:
