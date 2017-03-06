@@ -17,6 +17,7 @@
 *** TODO messages routing
 *** TODO open message routing
 *** TODO errors routing
+*** TODO client hang-up
 *** add event listener
 
 ** Optional features:
