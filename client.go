@@ -92,6 +92,20 @@ func NewSSEClient() *SSEClient {
 	return ssec
 }
 
+// SetMessagesBufferSize lets you specify how much buffering you want.
+// The default is one event.
+func (ssec *SSEClient) SetMessagesBufferSize(size int) {
+	ssec.messagesChan = make(chan *Event, size)
+}
+
+func (ssec *SSEClient) SetOpensBufferSize(size int) {
+	ssec.opensChan = make(chan bool, size)
+}
+
+func (ssec *SSEClient) SetErrorsBufferSize(size int) {
+	ssec.errorsChan = make(chan *Event, size)
+}
+
 // SetContext allows the context to be specified - this affects
 // cancelation and timeouts.  Affects active client on reconnection only.
 func (ssec *SSEClient) SetContext(ctx context.Context) {

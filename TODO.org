@@ -24,7 +24,7 @@
 *** DONE reader support
 *** TODO relative URLs
 *** TODO context cancellation
-*** buffering selection
+*** TODO buffering selection
 *** POST support
 *** no connect on create
 *** support for unusual HTTP responses (30x, 401 etc)
