@@ -24,7 +24,7 @@
 *** DONE reader support
 *** TODO relative URLs
 *** DONE context cancellation
-*** buffering selection
+*** TODO buffering selection
 *** relative URLs
 *** POST support
 *** no connect on create
