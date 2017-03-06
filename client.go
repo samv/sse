@@ -68,6 +68,9 @@ type SSEClient struct {
 	// whether to reconnect and after what time
 	reconnect     bool
 	reconnectTime time.Duration
+
+	// facilities for canceling clients
+	transport *http.Transport
 }
 
 // NewSSEClient creates a new client which can make a single SSE call.
@@ -81,6 +84,8 @@ func NewSSEClient() *SSEClient {
 		readyState:    Connecting,
 		reconnectTime: 2 * time.Second,
 	}
+	ssec.transport = &http.Transport{}
+	ssec.Client.Transport = ssec.transport
 	return ssec
 }
 
@@ -167,6 +172,27 @@ func (ssec *SSEClient) setReconnect(should bool) {
 	ssec.Lock()
 	ssec.reconnect = false
 	ssec.Unlock()
+}
+
+func (ssec *SSEClient) Close() {
+	ssec.setReconnect(false)
+	// TODO - this approach to canceling a request is deprecated, but
+	// the new method is go 1.7+; needs conditional compilation
+	ssec.transport.CancelRequest(ssec.request)
+}
+
+// Reopen allows a connection which was closed to be re-opened again.
+func (ssec *SSEClient) Reopen() error {
+	ssec.setReconnect(true)
+	_, err := ssec.stream()
+	return err
+}
+
+func (ssec *SSEClient) shouldReconnect() bool {
+	ssec.Lock()
+	should := ssec.reconnect
+	ssec.Unlock()
+	return should
 }
 
 func (ssec *SSEClient) want(what int32) {
@@ -276,8 +302,12 @@ func (ssec *SSEClient) process() {
 				if ssec.reconnectTime > time.Duration(0) {
 					time.Sleep(ssec.reconnectTime)
 				}
-				atomic.StoreInt32(&ssec.readyState, Connecting)
-				time.Sleep(ssec.reconnectTime)
+				if ssec.shouldReconnect() {
+					atomic.StoreInt32(&ssec.readyState, Connecting)
+					if ssec.reconnectTime > time.Duration(0) {
+						time.Sleep(ssec.reconnectTime)
+					}
+				}
 			} else {
 				ssec.emit(event)
 			}
