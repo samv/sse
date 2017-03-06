@@ -71,6 +71,7 @@ type SSEClient struct {
 	reconnectTime time.Duration
 
 	// facilities for canceling clients
+	ctx       context.Context
 	transport *http.Transport
 }
 
@@ -89,11 +90,12 @@ func NewSSEClient() *SSEClient {
 	return ssec
 }
 
-// SetBaseURL allows the main URL passed in to be a relative URL.
-func (ssec *SSEClient) SetBaseURL(uri string) error {
-	var err error
-	ssec.baseURL, err = url.Parse(uri)
-	return err
+// SetContext allows the context to be specified - this affects
+// cancelation and timeouts.  Affects active client on reconnection only.
+func (ssec *SSEClient) SetContext(ctx context.Context) {
+	ssec.Lock()
+	ssec.ctx = ctx
+	ssec.Unlock()
 }
 
 // GetStream makes a GET request and returns a channel for *all* events read
@@ -116,7 +118,10 @@ func (ssec *SSEClient) makeRequest() (*http.Request, error) {
 		return nil, err
 	}
 
-	request := req
+	// go 1.7+ presumably
+	var cancelCtx context.Context
+	cancelCtx, ssec.cancel = context.WithCancel(context.Background())
+	request := req.WithContext(cancelCtx)
 
 	request.Header.Set("Accept", "text/event-stream")
 	if ssec.lastEventId != "" {

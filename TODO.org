@@ -23,7 +23,7 @@
 ** Optional features:
 *** DONE reader support
 *** TODO relative URLs
-*** context cancellation
+*** TODO context cancellation
 *** buffering selection
 *** POST support
 *** no connect on create
