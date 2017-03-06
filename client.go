@@ -200,6 +200,13 @@ func (ssec *SSEClient) Errors() <-chan *Event {
 }
 
 func (ssec *SSEClient) emitError(err error) {
+	packagedError := &Event{
+		Origin:      ssec.origin, // not entirely true - might be the wrong thing
+		Error:       err,
+		Type:        ErrorType,
+		LastEventId: ssec.lastEventId,
+	}
+	ssec.emit(packagedError)
 }
 
 // URL returns the configured URL of the client
