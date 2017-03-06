@@ -52,6 +52,10 @@ type SSEClient struct {
 	readerError error
 	eventStream chan *Event
 
+	// SSE state
+	// reconnect time after losing connection
+	lastEventId string // sticky
+
 	// what messages are being sent through
 	wantStd int32
 
@@ -98,8 +102,13 @@ func (ssec *SSEClient) makeRequest() (*http.Request, error) {
 		return nil, err
 	}
 
+	request := req
+
 	request.Header.Set("Accept", "text/event-stream")
-	return request
+	if ssec.lastEventId != "" {
+		request.Header.Set("Last-Event-Id", ssec.lastEventId)
+	}
+	return req, nil
 }
 
 func (ssec *SSEClient) connect() error {
