@@ -102,3 +102,13 @@ func TestClientConnect(t *testing.T) {
 	testServer.Stop()
 	log.Printf("stopped")
 }
+
+//  "happy" case - connect to a server
+//    * client reading just messages
+//    * client watching errors
+//    * client watching for "open"
+
+//  "reconnect" cases -
+//    * reconnects by default
+//    * with a negotiated retry
+//    * client watching for "closed"

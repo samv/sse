@@ -13,8 +13,14 @@ import (
 )
 
 type ReadyState int32
+type WantFlag int32
 
 const (
+	// bitwise flags for selecting which events to pass through
+	WantErrors    WantFlag = 1
+	WantOpenClose WantFlag = 2
+	WantMessages  WantFlag = 4
+
 	// ReadyState is an enum representing the current status of the connection
 	Connecting ReadyState = 0
 	Open       ReadyState = 1
@@ -55,15 +61,39 @@ type SSEClient struct {
 	reconnectTime time.Duration
 
 	canceler
+
+	// reconnect time after losing connection
+	// what messages are being sent through
+	wantStd int32
+
+	// channels for these "standard" messages
+	messageChan chan *Event // standard message channel
+	openChan    chan bool   // open/close notification channel
+	errorChan   chan error  // error channel
 }
 
 // NewSSEClient creates a new client which can make a single SSE call.
-func NewSSEClient() *SSEClient {
+func NewSSEClient(options ...ConfigOption) *SSEClient {
 	ssec := &SSEClient{
 		readyState:    int32(Connecting),
 		reconnectTime: time.Second,
 	}
+	for _, option := range options {
+		option.Apply(ssec)
+	}
 	ssec.initTransport()
+	if ssec.wantStd == 0 {
+		ssec.wantStd = int32(WantMessages)
+	}
+	if ssec.messageChan == nil {
+		ssec.messageChan = make(chan *Event)
+	}
+	if ssec.openChan == nil {
+		ssec.openChan = make(chan bool)
+	}
+	if ssec.errorChan == nil {
+		ssec.errorChan = make(chan error)
+	}
 	return ssec
 }
 
@@ -168,6 +198,36 @@ func (ssec *SSEClient) shouldReconnect() bool {
 	should := ssec.reconnect
 	ssec.Unlock()
 	return should
+}
+
+func (ssec *SSEClient) wants(what WantFlag) bool {
+	return (atomic.LoadInt32(&ssec.wantStd) & int32(what)) != 0
+}
+
+func (ssec *SSEClient) demand(what WantFlag) {
+	if !ssec.wants(what) {
+		// seems silly to use both atomic load and mutex, but this is
+		// a read, modify, update, and the fastpath is lockless atomic read
+		ssec.Lock()
+		wants := atomic.LoadInt32(&ssec.wantStd) | int32(what)
+		atomic.StoreInt32(&ssec.wantStd, wants)
+		ssec.Unlock()
+	}
+}
+
+func (ssec *SSEClient) Messages() <-chan *Event {
+	ssec.demand(WantMessages)
+	return ssec.messageChan
+}
+
+func (ssec *SSEClient) Opens() <-chan bool {
+	ssec.demand(WantOpenClose)
+	return ssec.openChan
+}
+
+func (ssec *SSEClient) Errors() <-chan error {
+	ssec.demand(WantErrors)
+	return ssec.errorChan
 }
 
 // URL returns the configured URL of the client
