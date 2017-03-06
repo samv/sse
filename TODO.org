@@ -26,6 +26,7 @@
 *** relative URLs
 *** POST support
 *** no connect on create
+*** support for unusual HTTP responses (30x, 401 etc)
 
 * Test strategies
 ** DONE "service layer" testing - reader in, events out
