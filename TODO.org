@@ -13,7 +13,7 @@
 **** origin tracking
 **** last-event-id tracking
 ** EventSource API
-*** add event channel
+*** TODO add event channel
 *** TODO messages routing
 *** TODO open message routing
 *** TODO errors routing
@@ -22,9 +22,9 @@
 
 ** Optional features:
 *** DONE reader support
-*** buffering selection
-*** context cancellation
 *** relative URLs
+*** context cancellation
+*** buffering selection
 *** POST support
 *** no connect on create
 *** support for unusual HTTP responses (30x, 401 etc)

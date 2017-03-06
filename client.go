@@ -58,12 +58,14 @@ type SSEClient struct {
 	lastEventId string // sticky
 
 	// what messages are being sent through
-	wantStd int32
-
-	// channels for these "standard" messages
+	// 1. "standard" channels
+	wantStd      int32
 	messagesChan chan *Event // standard message channel
 	opensChan    chan bool   // open/close notification channel
 	errorsChan   chan *Event // error channel
+
+	// 2. explicitly subscribed events
+	wantTypes map[string]chan<- *Event
 
 	// whether to reconnect and after what time
 	reconnect     bool
@@ -206,6 +208,11 @@ func (ssec *SSEClient) want(what int32) {
 	}
 }
 
+func (ssec *SSEClient) addEventChannel(eventType string, eventChan chan<- *Event) {
+	ssec.Lock()
+	ssec.wantTypes[messageType] = eventChan
+	ssec.Unlock()
+}
 func (ssec *SSEClient) Messages() <-chan *Event {
 	ssec.want(wantMessages)
 	return ssec.messagesChan
@@ -233,6 +240,17 @@ func (ssec *SSEClient) emit(event *Event) {
 			ssec.errorsChan <- event
 		}
 	}
+	// always send to explicitly configured channels
+	if sendChan := ssec.getEmitChan(event.Type); sendChan != nil {
+		sendChan <- event
+	}
+}
+
+func (ssec *SSEClient) getEmitChan(eventType string) <-chan *Event {
+	ssec.Lock()
+	rchan := ssec.wantTypes[eventType]
+	ssec.Unlock()
+	return rchan
 }
 
 func (ssec *SSEClient) Opens() <-chan bool {
