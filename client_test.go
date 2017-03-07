@@ -6,3 +6,4 @@ package sse
 
 //  "reconnect" cases -
 //    * reconnects by default
+//    * with a negotiated retry

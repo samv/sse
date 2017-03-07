@@ -169,7 +169,9 @@ func (ssec *SSEClient) process() {
 				if reader.Retry >= time.Duration(0) {
 					ssec.reconnectTime = reader.Retry
 				}
-				time.Sleep(ssec.reconnectTime)
+				if ssec.reconnectTime > time.Duration(0) {
+					time.Sleep(ssec.reconnectTime)
+				}
 				atomic.StoreInt32(&ssec.readyState, Connecting)
 			}
 		}

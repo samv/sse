@@ -3,7 +3,7 @@
 ** TODO core protocol handling
 *** DONE text/event-stream decoding
 *** DONE event stream protocol state
-**** retry negotiation
+**** TODO retry negotiation
 **** origin tracking
 *** client connection
 **** TODO connection
