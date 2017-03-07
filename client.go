@@ -61,11 +61,8 @@ type SSEClient struct {
 
 	canceler
 
-	// reconnect time after losing connection
-	// what messages are being sent through
-	wantStd int32
-
 	// channels for these "standard" messages
+	wantStd int32
 	messageChan chan *Event // standard message channel
 	openChan    chan bool   // open/close notification channel
 	errorChan   chan error  // error channel
