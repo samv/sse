@@ -52,7 +52,6 @@ type SSEClient struct {
 	readerError error
 	eventStream chan *Event
 
-	// reconnect time after losing connection
 	// what messages are being sent through
 	wantStd int32
 
@@ -60,17 +59,21 @@ type SSEClient struct {
 	messagesChan chan *Event // standard message channel
 	opensChan    chan bool   // open/close notification channel
 	errorsChan   chan *Event // error channel
+
+	// reconnect time after losing connection
+	reconnectTime time.Duration
 }
 
 // NewSSEClient creates a new client which can make a single SSE call.
 func NewSSEClient() *SSEClient {
 	ssec := &SSEClient{
-		readyState: Connecting,
-		eventChan:  make(chan *Event, 1),
-		onlineChan: make(chan bool, 1),
-		errorChan:  make(chan error, 1),
-		want:       wantMessages,
-		readyState: Connecting,
+		readyState:    Connecting,
+		eventChan:     make(chan *Event, 1),
+		onlineChan:    make(chan bool, 1),
+		errorChan:     make(chan error, 1),
+		want:          wantMessages,
+		readyState:    Connecting,
+		reconnectTime: 2 * time.Second,
 	}
 	return ssec
 }
@@ -245,14 +248,19 @@ func (ssec *SSEClient) process() {
 				break
 			} else {
 				atomic.StoreInt32(&ssec.readyState, Open)
-				go ssec.readStream()
 			}
 		}
+		go readStream()
 		select {
 		case event, ok := <-eventChan:
 			if !ok {
 				ssec.response.Body.Close()
 				ssec.response = nil
+				if reader.Retry >= time.Duration(0) {
+					ssec.reconnectTime = reader.Retry
+				}
+				atomic.StoreInt32(&ssec.readyState, Connecting)
+				time.Sleep(ssec.reconnectTime)
 			} else {
 				ssec.emit(event)
 			}
