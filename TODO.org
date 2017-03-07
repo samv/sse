@@ -6,8 +6,11 @@
 **** retry negotiation
 **** origin tracking
 *** client connection
+**** TODO connection
+**** reconnection
 **** retry negotiation
 **** origin tracking
+**** last-event-id tracking
 ** EventSource API
 *** add event channel
 *** messages routing
