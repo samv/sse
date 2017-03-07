@@ -32,6 +32,7 @@ func newEventStreamReader(reader io.Reader, origin string) *eventStreamReader {
 	return &eventStreamReader{
 		reader: reader,
 		Origin: origin,
+		Retry:  time.Duration(-1),
 	}
 }
 
