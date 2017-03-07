@@ -7,7 +7,7 @@
 **** origin tracking
 *** client connection
 **** TODO connection
-**** reconnection
+**** TODO reconnection
 **** retry negotiation
 **** origin tracking
 **** last-event-id tracking

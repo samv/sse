@@ -46,12 +46,16 @@ type SSEClient struct {
 	reader      *StreamEventReader
 	readerError error
 	eventStream chan *Event
+
+	// reconnect time after losing connection
+	reconnectTime time.Duration
 }
 
 // NewSSEClient creates a new client which can make a single SSE call.
 func NewSSEClient() *SSEClient {
 	ssec := &SSEClient{
-		readyState: Connecting,
+		readyState:    Connecting,
+		reconnectTime: 2 * time.Second,
 	}
 	return ssec
 }
@@ -154,14 +158,19 @@ func (ssec *SSEClient) process() {
 				break
 			} else {
 				atomic.StoreInt32(&ssec.readyState, Open)
-				go ssec.readStream()
 			}
 		}
+		go readStream()
 		select {
 		case event, ok := <-eventChan:
 			if !ok {
 				ssec.response.Body.Close()
 				ssec.response = nil
+				if reader.Retry >= time.Duration(0) {
+					ssec.reconnectTime = reader.Retry
+				}
+				time.Sleep(ssec.reconnectTime)
+				atomic.StoreInt32(&ssec.readyState, Connecting)
 			}
 		}
 	}
