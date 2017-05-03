@@ -8,14 +8,16 @@ import (
 	"time"
 )
 
+// protocol header constants
 var (
-	// protocol values - headers etc
 	IDHeader    = []byte("id")
 	EventHeader = []byte("event")
 	DataHeader  = []byte("data")
 	RetryHeader = []byte("retry")
+)
 
-	// known types for messages
+// message types/names
+const (
 	MessageType = "message"
 	ErrorType   = "error"
 )
