@@ -7,8 +7,8 @@ import (
 
 // Event is a structure holding SSE-compliant events
 type Event struct {
-	// LastEventID is the ID of the event, or a previous event
-	LastEventID string
+	// EventID is the ID of the event, or a previous event
+	EventID string
 
 	// Type is variously called "event type" and "event name" in the
 	// TR.  Defaults to "message".  You must listen for specific named
@@ -32,4 +32,10 @@ type Event struct {
 // functions.
 func (ev *Event) Reader() io.ReadSeeker {
 	return bytes.NewReader(ev.Data)
+}
+
+// GetData implements the SinkEvent interface, so that sse.Event can
+// be used for sinks and sources.
+func (ev *Event) GetData() ([]byte, error) {
+	return ev.Data, nil
 }
