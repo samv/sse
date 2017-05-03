@@ -45,3 +45,9 @@ func (ev *Event) GetData() ([]byte, error) {
 func (ev *Event) EventName() string {
 	return ev.Type
 }
+
+// EventName implements the EventIDer interface so that you can use
+// sse.Event to set the event id for reliable/at-least-once delivery
+func (ev *Event) EventID() string {
+	return ev.LastEventID
+}

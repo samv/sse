@@ -18,6 +18,13 @@ type NamedEvent interface {
 	EventName() string
 }
 
+// EventIDer is for responses which set the last event ID so that
+// clients can specify it when they reconnect (this is automatic by
+// the browser implementation of EventSource)
+type EventIDer interface {
+	EventID() string
+}
+
 // EventSink is a structure used by the event sink writer
 type EventSink struct {
 	w           http.ResponseWriter
@@ -112,6 +119,16 @@ func (sink *EventSink) Sink() error {
 }
 
 func (sink *EventSink) sinkEvent(event SinkEvent) error {
+
+	// Handle an event ID passed along with the message
+	var writeErr error
+	if eventIDer, ok := event.(EventIDer); ok {
+		eventID := eventIDer.EventID()
+		_, writeErr = sink.w.Write(idHeader)
+		if writeErr == nil {
+			_, writeErr = sink.w.Write(append([]byte(eventID), newLine...))
+		}
+	}
 
 	var eventName = "message"
 	if namedEvent, ok := event.(NamedEvent); ok {
