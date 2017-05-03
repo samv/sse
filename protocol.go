@@ -10,7 +10,7 @@ import (
 
 var (
 	// protocol values - headers etc
-	IdHeader    = []byte("id")
+	IDHeader    = []byte("id")
 	EventHeader = []byte("event")
 	DataHeader  = []byte("data")
 	RetryHeader = []byte("retry")
@@ -37,7 +37,7 @@ func (decoder *EventStreamReader) decode(events chan<- *Event) error {
 	scanner := bufio.NewScanner(decoder.reader)
 	scanner.Split(SplitFunc())
 
-	var lastEventId string
+	var lastEventID string
 
 	// When a stream is parsed, a _data_ buffer and an _event name_
 	// buffer must be associated with it. They must be initialized to
@@ -66,7 +66,7 @@ func (decoder *EventStreamReader) decode(events chan<- *Event) error {
 				eventName = "message"
 			}
 			event := &Event{
-				LastEventId: lastEventId,
+				LastEventID: lastEventID,
 				Origin:      decoder.Origin,
 				Data:        eventData,
 				Type:        eventName,
@@ -129,10 +129,10 @@ func (decoder *EventStreamReader) decode(events chan<- *Event) error {
 					data.Write(value)
 					data.WriteRune('\n')
 				}
-			case bytes.Equal(field, IdHeader):
+			case bytes.Equal(field, IDHeader):
 				// If the field name is "id"
 				// Set the event stream's _last event ID_ to the field value.
-				lastEventId = string(value)
+				lastEventID = string(value)
 			case bytes.Equal(field, RetryHeader):
 				// If the field name is "retry"
 				//

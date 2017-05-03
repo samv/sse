@@ -39,7 +39,7 @@ func AssertEmitsEvents(t *testing.T, expected []*Event, stream []byte, groupLabe
 				expected := expected[idx]
 				assert.Equal(t, string(expected.Data), string(yielded.Data), eventNum)
 				assert.Equal(t, expected.Type, yielded.Type, eventNum)
-				assert.Equal(t, expected.LastEventId, yielded.LastEventId, eventNum)
+				assert.Equal(t, expected.LastEventID, yielded.LastEventID, eventNum)
 			}
 		}
 		idx++
@@ -75,7 +75,7 @@ id
 
 data: third event`),
 		expected: []*Event{
-			{Type: "message", LastEventId: "1", Data: []byte("first event")},
+			{Type: "message", LastEventID: "1", Data: []byte("first event")},
 			{Type: "message", Data: []byte("second event")},
 			{Type: "message", Data: []byte("third event")},
 		},

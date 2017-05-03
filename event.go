@@ -7,8 +7,8 @@ import (
 
 // Event is a structure holding SSE-compliant events
 type Event struct {
-	// LastEventId is the ID of the event or a previous event
-	LastEventId string
+	// LastEventID is the ID of the event, or a previous event
+	LastEventID string
 
 	// Type is variously called "event type" and "event name" in the
 	// TR.  Defaults to "message".  You must listen for specific named
