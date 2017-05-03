@@ -13,6 +13,11 @@ type SinkEvent interface {
 	GetData() ([]byte, error)
 }
 
+// NamedEvent is for responses which are not standard 'message' events
+type NamedEvent interface {
+	EventName() string
+}
+
 // EventSink is a structure used by the event sink writer
 type EventSink struct {
 	w           http.ResponseWriter
@@ -107,6 +112,16 @@ func (sink *EventSink) Sink() error {
 }
 
 func (sink *EventSink) sinkEvent(event SinkEvent) error {
+
+	var eventName = "message"
+	if namedEvent, ok := event.(NamedEvent); ok {
+		eventName = namedEvent.EventName()
+		_, writeErr = sink.w.Write(EventHeader)
+		if writeErr == nil {
+			millis := []byte(strconv.Itoa(int(retry / time.Millisecond)))
+			_, writeErr = sink.w.Write(append(millis, newLine...))
+		}
+	}
 
 	if writeErr == nil {
 		eventBody, dataErr = event.GetData()

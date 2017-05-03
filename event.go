@@ -39,3 +39,9 @@ func (ev *Event) Reader() io.ReadSeeker {
 func (ev *Event) GetData() ([]byte, error) {
 	return ev.Data, nil
 }
+
+// EventName implements the NamedEvent interface so that you can use
+// sse.Event to set the event name.
+func (ev *Event) EventName() string {
+	return ev.Type
+}
