@@ -15,10 +15,10 @@ type streamTestCase struct {
 	expected []*Event
 }
 
-func assertEmitsEvents(t *testing.T, expected []*Event, stream []byte, groupLabel string) (*EventStreamReader, error) {
+func assertEmitsEvents(t *testing.T, expected []*Event, stream []byte, groupLabel string) (*eventStreamReader, error) {
 	reader := bytes.NewReader(stream)
 	dummyOrigin := "http://test.example.com/"
-	protocol := NewEventStreamReader(reader, dummyOrigin)
+	protocol := newEventStreamReader(reader, dummyOrigin)
 
 	eventChan := make(chan *Event)
 	var waitGroup sync.WaitGroup

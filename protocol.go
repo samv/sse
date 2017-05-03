@@ -22,20 +22,20 @@ const (
 	ErrorType   = "error"
 )
 
-type EventStreamReader struct {
+type eventStreamReader struct {
 	reader io.Reader
 	Origin string
 	Retry  time.Duration
 }
 
-func NewEventStreamReader(reader io.Reader, origin string) *EventStreamReader {
-	return &EventStreamReader{
+func newEventStreamReader(reader io.Reader, origin string) *eventStreamReader {
+	return &eventStreamReader{
 		reader: reader,
 		Origin: origin,
 	}
 }
 
-func (decoder *EventStreamReader) decode(events chan<- *Event) error {
+func (decoder *eventStreamReader) decode(events chan<- *Event) error {
 	scanner := bufio.NewScanner(decoder.reader)
 	scanner.Split(SplitFunc())
 
