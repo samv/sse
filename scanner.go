@@ -55,9 +55,8 @@ func (state *parseState) scan(data []byte, atEOF bool) (advance int, token []byt
 		if *state == atEndOfLine || *state == midEOL {
 			*state = endOfStream
 			return 0, endOfLine, nil
-		} else {
-			return 0, nil, nil
 		}
+		return 0, nil, nil
 	}
 	switch *state {
 	case startOfStream:
@@ -71,10 +70,9 @@ func (state *parseState) scan(data []byte, atEOF bool) (advance int, token []byt
 	case midEOL:
 		if data[0] == '\n' {
 			return 1, nil, nil
-		} else {
-			*state = startOfLine
-			return state.scanStartOfLine(data, atEOF)
 		}
+		*state = startOfLine
+		return state.scanStartOfLine(data, atEOF)
 	case comment, readDelim:
 		return state.scanAnyChar(data, atEOF)
 	case readField:
@@ -103,14 +101,12 @@ func (state *parseState) scanBOM(data []byte, atEOF bool) (advance int, token []
 	}
 	if maybe {
 		return 0, nil, nil
-	} else {
-		*state = startOfLine
-		if no {
-			return -1, nil, nil
-		} else {
-			return 3, nil, nil
-		}
 	}
+	*state = startOfLine
+	if no {
+		return -1, nil, nil
+	}
+	return 3, nil, nil
 }
 
 // scanStartOfLine scans most of this rule:
@@ -130,9 +126,8 @@ func (state *parseState) scanStartOfLine(data []byte, atEOF bool) (advance int, 
 		if idx == -1 {
 			if !atEOF {
 				return 0, nil, nil
-			} else {
-				idx = len(data)
 			}
+			idx = len(data)
 		}
 		*state = readField
 		return idx, validUTF8(data[:idx]), nil
@@ -152,13 +147,12 @@ func (state *parseState) scanAnyChar(data []byte, atEOF bool) (advance int, toke
 		idx := bytes.IndexAny(data, "\n\r")
 		if idx == -1 && !atEOF {
 			return 0, nil, nil
-		} else {
-			if idx == -1 {
-				idx = len(data)
-			}
-			*state = atEndOfLine
-			return idx, validUTF8(data[:idx]), nil
 		}
+		if idx == -1 {
+			idx = len(data)
+		}
+		*state = atEndOfLine
+		return idx, validUTF8(data[:idx]), nil
 	}
 }
 
@@ -175,17 +169,15 @@ func (state *parseState) scanDelim(data []byte, atEOF bool) (advance int, token 
 			if atEOF {
 				*state = readDelim
 				return 1, fieldDelim, nil
-			} else {
-				return 0, nil, nil
 			}
-		} else {
-			*state = readDelim
-			advance = 1
-			if data[1] == ' ' {
-				advance = 2
-			}
-			return advance, fieldDelim, nil
+			return 0, nil, nil
 		}
+		*state = readDelim
+		advance = 1
+		if data[1] == ' ' {
+			advance = 2
+		}
+		return advance, fieldDelim, nil
 	default:
 		// should never happen; can't get into readField state unless
 		// next char is '\r', '\n' or ':'
