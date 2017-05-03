@@ -10,11 +10,11 @@ import (
 
 var (
 	// standard forms of tokens used in this implementation
-	EndOfLine  = []byte{'\n'}
-	FieldDelim = []byte{':', ' '}
+	endOfLine  = []byte{'\n'}
+	fieldDelim = []byte{':', ' '}
 
 	// Comments are used for keep-alives
-	CommentMarker = []byte{':'}
+	commentMarker = []byte{':'}
 
 	// the spec specifies this as a replacement character for errors
 	replacementChar = []byte("\uFFFD")
@@ -31,7 +31,7 @@ const (
 	readField
 	readDelim
 	midEOL
-	endOfLine
+	atEndOfLine
 	endOfStream
 )
 
@@ -52,9 +52,9 @@ func SplitFunc() func([]byte, bool) (int, []byte, error) {
 // scan is the function called by Scanner.Split() to find the next token.
 func (state *parseState) scan(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if len(data) == 0 {
-		if *state == endOfLine || *state == midEOL {
+		if *state == atEndOfLine || *state == midEOL {
 			*state = endOfStream
-			return 0, EndOfLine, nil
+			return 0, endOfLine, nil
 		} else {
 			return 0, nil, nil
 		}
@@ -79,7 +79,7 @@ func (state *parseState) scan(data []byte, atEOF bool) (advance int, token []byt
 		return state.scanAnyChar(data, atEOF)
 	case readField:
 		return state.scanDelim(data, atEOF)
-	case endOfLine:
+	case atEndOfLine:
 		return state.scanEndOfLine(data, atEOF)
 	default:
 		panic(fmt.Sprintf("bad state %v", state))
@@ -119,11 +119,11 @@ func (state *parseState) scanStartOfLine(data []byte, atEOF bool) (advance int, 
 	switch data[0] {
 	case '\r', '\n':
 		// an event is complete
-		*state = endOfLine
+		*state = atEndOfLine
 		return state.scanEndOfLine(data, atEOF)
 	case ':':
 		*state = comment
-		return 1, CommentMarker, nil
+		return 1, commentMarker, nil
 	default:
 		// field name character
 		idx := bytes.IndexAny(data, "\n\r:")
@@ -146,7 +146,7 @@ func (state *parseState) scanAnyChar(data []byte, atEOF bool) (advance int, toke
 	switch data[0] {
 	case '\r', '\n':
 		// no data.  can't emit an empty token, so...
-		*state = endOfLine
+		*state = atEndOfLine
 		return state.scanEndOfLine(data, atEOF)
 	default:
 		idx := bytes.IndexAny(data, "\n\r")
@@ -156,7 +156,7 @@ func (state *parseState) scanAnyChar(data []byte, atEOF bool) (advance int, toke
 			if idx == -1 {
 				idx = len(data)
 			}
-			*state = endOfLine
+			*state = atEndOfLine
 			return idx, validUTF8(data[:idx]), nil
 		}
 	}
@@ -168,13 +168,13 @@ func (state *parseState) scanDelim(data []byte, atEOF bool) (advance int, token 
 	switch data[0] {
 	case '\r', '\n':
 		// no data.  can't emit an empty token, so...
-		*state = endOfLine
+		*state = atEndOfLine
 		return state.scanEndOfLine(data, atEOF)
 	case ':':
 		if len(data) == 1 {
 			if atEOF {
 				*state = readDelim
-				return 1, FieldDelim, nil
+				return 1, fieldDelim, nil
 			} else {
 				return 0, nil, nil
 			}
@@ -184,7 +184,7 @@ func (state *parseState) scanDelim(data []byte, atEOF bool) (advance int, token 
 			if data[1] == ' ' {
 				advance = 2
 			}
-			return advance, FieldDelim, nil
+			return advance, fieldDelim, nil
 		}
 	default:
 		// should never happen; can't get into readField state unless
@@ -204,17 +204,17 @@ func (state *parseState) scanEndOfLine(data []byte, atEOF bool) (advance int, to
 			if !atEOF {
 				*state = midEOL
 			}
-			return 1, EndOfLine, nil
+			return 1, endOfLine, nil
 		} else if data[1] == '\n' {
 			*state = startOfLine
-			return 2, EndOfLine, nil
+			return 2, endOfLine, nil
 		} else {
 			*state = startOfLine
-			return 1, EndOfLine, nil
+			return 1, endOfLine, nil
 		}
 	case '\n':
 		*state = startOfLine
-		return 1, EndOfLine, nil
+		return 1, endOfLine, nil
 	default:
 		// should never happen; can't get into readField state unless
 		// next char is '\r' or '\n'

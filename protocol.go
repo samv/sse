@@ -84,11 +84,11 @@ func (decoder *EventStreamReader) decode(events chan<- *Event) error {
 	for scanner.Scan() {
 		token := scanner.Bytes()
 		switch {
-		case bytes.Equal(token, EndOfLine):
+		case bytes.Equal(token, endOfLine):
 			// If the line is empty (a blank line)
 			// Dispatch the event
 			dispatch()
-		case bytes.Equal(token, CommentMarker):
+		case bytes.Equal(token, commentMarker):
 			// If the line starts with a U+003A COLON character (:)
 			// Ignore the line.
 		default:
@@ -102,11 +102,11 @@ func (decoder *EventStreamReader) decode(events chan<- *Event) error {
 			// string.
 			var value []byte
 			var hasValue bool
-			if scanner.Scan() && bytes.Equal(scanner.Bytes(), FieldDelim) {
+			if scanner.Scan() && bytes.Equal(scanner.Bytes(), fieldDelim) {
 				hasValue = true
 				if scanner.Scan() {
 					value = scanner.Bytes()
-					if bytes.Equal(value, EndOfLine) {
+					if bytes.Equal(value, endOfLine) {
 						value = []byte{}
 					} else {
 						// swallow the end of line

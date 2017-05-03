@@ -15,7 +15,7 @@ type streamTestCase struct {
 	expected []*Event
 }
 
-func AssertEmitsEvents(t *testing.T, expected []*Event, stream []byte, groupLabel string) (*EventStreamReader, error) {
+func assertEmitsEvents(t *testing.T, expected []*Event, stream []byte, groupLabel string) (*EventStreamReader, error) {
 	reader := bytes.NewReader(stream)
 	dummyOrigin := "http://test.example.com/"
 	protocol := NewEventStreamReader(reader, dummyOrigin)
@@ -108,7 +108,7 @@ data: test
 
 func TestSpecExamples(t *testing.T) {
 	for i, eg := range specExampleStreams {
-		AssertEmitsEvents(t, eg.expected, eg.stream, fmt.Sprintf("Spec Example #%d", i+1))
+		assertEmitsEvents(t, eg.expected, eg.stream, fmt.Sprintf("Spec Example #%d", i+1))
 	}
 }
 
@@ -133,7 +133,7 @@ data: {"username": "John123", "emotion": "happy"}
 
 func TestCustomEvents(t *testing.T) {
 	for i, eg := range customEventTests {
-		AssertEmitsEvents(t, eg.expected, eg.stream, fmt.Sprintf("Custom Event Test #%d", i+1))
+		assertEmitsEvents(t, eg.expected, eg.stream, fmt.Sprintf("Custom Event Test #%d", i+1))
 	}
 }
 
@@ -143,6 +143,6 @@ func TestRetry(t *testing.T) {
 		stream:   []byte("retry: 10000\ndata: hello world\n\n"),
 		expected: []*Event{{Type: "message", Data: []byte(`hello world`)}},
 	}
-	protocol, _ := AssertEmitsEvents(t, retryTest.expected, retryTest.stream, "retry test")
+	protocol, _ := assertEmitsEvents(t, retryTest.expected, retryTest.stream, "retry test")
 	assert.Equal(t, 10*time.Second, protocol.Retry)
 }
