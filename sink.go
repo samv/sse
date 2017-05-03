@@ -13,6 +13,12 @@ type SinkEvent interface {
 	GetData() ([]byte, error)
 }
 
+// KeepAliver is for event sources (or responses) to specify the keep
+// alive TTL which applies until the next event is read.
+type KeepAliver interface {
+	KeepAlive() time.Duration
+}
+
 // NamedEvent is for responses which are not standard 'message' events
 type NamedEvent interface {
 	EventName() string
@@ -25,13 +31,34 @@ type EventIDer interface {
 	EventID() string
 }
 
+// Resumer is for events which specify that they have a resume TTL
+type GetRetrier interface {
+	GetRetry() time.Duration
+}
+
+// default is to send a keepalive every minute.  Override by calling
+// SetKeepAlive(), ideally before Sink()
+const defaultKeepAlive = 60 * time.Second
+const defaultKeepAlivePrefix = "sse.EventSink: "
+
 // EventSink is a structure used by the event sink writer
 type EventSink struct {
+	sync.Mutex
 	w           http.ResponseWriter
 	flush       http.Flusher
 	feed        <-chan SinkEvent
 	closeNotify <-chan bool
 	closedChan  chan struct{}
+
+	// keepAlive-related
+	keepAliveTime     time.Duration
+	keepAliveTimer    *time.Timer
+	KeepAlivePrefix   string
+	KeepAliveShowInfo bool
+	onlineSince       time.Time
+
+	// records the last retry time set.
+	retryTime time.Duration
 }
 
 // SinkEvents is an more-or-less drop-in replacement for a responder
@@ -70,6 +97,9 @@ func NewEventSink(w http.ResponseWriter, feed EventFeed) (*EventSink, error) {
 	// pass the message via channel-close semantics
 	sink.closedChan = make(chan struct{})
 	sink.feed = feed.GetEventChan(sink.closedChan)
+	sink.SetKeepAlive(defaultKeepAlive)
+	sink.KeepAlivePrefix = defaultKeepAlivePrefix
+	sink.KeepAliveShowInfo = true
 
 	return sink
 }
@@ -85,6 +115,9 @@ func (sink *EventSink) Respond(code int) {
 
 	sink.w.WriteHeader(code)
 	sink.flush.Flush()
+
+	sink.onlineSince = time.Now()
+	sink.resetKeepAlive()
 }
 
 func (sink *EventSink) closeFeed() {
@@ -111,6 +144,15 @@ func (sink *EventSink) Sink() error {
 			}
 			if sinkErr = sink.sinkEvent(event); sinkErr != nil {
 				sink.closeFeed()
+			} else {
+				sink.resetKeepAlive()
+			}
+
+		case <-sink.keepAliveTimer.C:
+			if sinkErr = sink.writeKeepAlive(); sinkErr != nil {
+				sink.closeFeed()
+			} else {
+				sink.resetKeepAlive()
 			}
 		}
 	}
@@ -118,7 +160,60 @@ func (sink *EventSink) Sink() error {
 	return sinkErr
 }
 
+func (sink *EventSink) resetKeepAlive() {
+	sink.Lock()
+	keepAlive := sink.keepAliveTime
+	sink.Unlock()
+	if keepAliveTime > time.Millisecond {
+		sink.keepAliveTimer.Reset(keepAliveTime)
+	}
+}
+
+func (sink *EventSink) writeKeepAlive() error {
+	var keepAliveMsg bytes.Buffer
+	keepAliveMsg.WriteRune(':')
+	if len(sink.KeepAlivePrefix) > 0 {
+		keepAliveMsg.WriteString(sink.KeepAlivePrefix)
+	}
+	if sink.KeepAliveShowInfo {
+		now := time.Now()
+		keepAliveMsg.WriteString(fmt.Sprintf(
+			"server time is %v, online for %v", now, now.Sub(sink.onlineSince),
+		))
+	}
+	keepAliveMsg.WriteRune('\n')
+	_, err := sink.w.Write(keepAliveMsg.Bytes())
+	return err
+}
+
+// SetKeepAlive sets the current keepalive time for an event sink.
+func (sink *EventSink) GetKeepAlive() time.Duration {
+	sink.Lock()
+	keepAlive := sink.keepAliveTime
+	sink.Unlock()
+	return keepAlive
+}
+
+// SetKeepAlive sets the current keepalive time for an event sink.  It does not reset the timer;
+// if you want to do that, call this
+func (sink *EventSink) SetKeepAlive(keepAlive time.Duration) {
+	sink.Lock()
+	defer sink.Unlock()
+	keepAlive := keepAliver.KeepAlive()
+	if sink.keepAliveTimer == nil {
+		sink.keepAliveTimer = time.NewTimer(time.Second)
+	}
+	if keepAlive != sink.KeepAliveTime {
+		sink.KeepAliveTime = keepAlive
+	}
+}
+
 func (sink *EventSink) sinkEvent(event SinkEvent) error {
+
+	// check for the various capabilities passed via response events
+	if keepAliver, ok := event.(KeepAliver); ok {
+		sink.SetKeepAlive(keepAliver.KeepAlive())
+	}
 
 	// Handle an event ID passed along with the message
 	var writeErr error
@@ -127,6 +222,18 @@ func (sink *EventSink) sinkEvent(event SinkEvent) error {
 		_, writeErr = sink.w.Write(idHeader)
 		if writeErr == nil {
 			_, writeErr = sink.w.Write(append([]byte(eventID), newLine...))
+		}
+	}
+
+	// handle a retry time passed along with a message
+	if getRetryer, ok := event.(GetRetrier); ok {
+		retry := resumer.GetRetry()
+		if sink.RetryTime != retry {
+			_, writeErr = sink.w.Write(retryHeader)
+			if writeErr == nil {
+				millis := []byte(strconv.Itoa(int(retry / time.Millisecond)))
+				_, writeErr = sink.w.Write(append(millis, newLine...))
+			}
 		}
 	}
 
