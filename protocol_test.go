@@ -62,7 +62,7 @@ id
 
 data: third event`),
 		expected: []*Event{
-			{Type: "message", LastEventID: "1", Data: []byte("first event")},
+			{Type: "message", EventID: "1", Data: []byte("first event")},
 			{Type: "message", Data: []byte("second event")},
 			{Type: "message", Data: []byte("third event")},
 		},

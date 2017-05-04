@@ -68,10 +68,10 @@ func (decoder *eventStreamReader) decode(events chan<- *Event) {
 				eventName = "message"
 			}
 			event := &Event{
-				LastEventID: lastEventID,
-				Origin:      decoder.Origin,
-				Data:        eventData,
-				Type:        eventName,
+				EventID: lastEventID,
+				Origin:  decoder.Origin,
+				Data:    eventData,
+				Type:    eventName,
 			}
 			events <- event
 		}
