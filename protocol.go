@@ -35,7 +35,7 @@ func newEventStreamReader(reader io.Reader, origin string) *eventStreamReader {
 	}
 }
 
-func (decoder *eventStreamReader) decode(events chan<- *Event) error {
+func (decoder *eventStreamReader) decode(events chan<- *Event) {
 	scanner := bufio.NewScanner(decoder.reader)
 	scanner.Split(SplitFunc())
 
@@ -155,5 +155,11 @@ func (decoder *eventStreamReader) decode(events chan<- *Event) error {
 		}
 	}
 	dispatch()
-	return nil
+	close(events)
+}
+
+func (decoder *eventStreamReader) decodeChan() <-chan *Event {
+	eventChan := make(chan *Event)
+	go decoder.decode(eventChan)
+	return eventChan
 }

@@ -3,7 +3,6 @@ package sse
 import (
 	"bytes"
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
@@ -15,23 +14,13 @@ type streamTestCase struct {
 	expected []*Event
 }
 
-func assertEmitsEvents(t *testing.T, expected []*Event, stream []byte, groupLabel string) (*eventStreamReader, error) {
+func assertEmitsEvents(t *testing.T, expected []*Event, stream []byte, groupLabel string) *eventStreamReader {
 	reader := bytes.NewReader(stream)
 	dummyOrigin := "http://test.example.com/"
 	protocol := newEventStreamReader(reader, dummyOrigin)
 
-	eventChan := make(chan *Event)
-	var waitGroup sync.WaitGroup
-	waitGroup.Add(1)
-	var protocolError error
-	go func() {
-		protocolError = protocol.decode(eventChan)
-		close(eventChan)
-		waitGroup.Done()
-	}()
-
 	idx := 0
-	for yielded := range eventChan {
+	for yielded := range protocol.decodeChan() {
 		eventNum := fmt.Sprintf("%s, event #%d", groupLabel, idx+1)
 		if assert.NotNil(t, yielded, eventNum) {
 			if assert.True(t, idx < len(expected), eventNum+" (no extra events)") {
@@ -39,16 +28,14 @@ func assertEmitsEvents(t *testing.T, expected []*Event, stream []byte, groupLabe
 				expected := expected[idx]
 				assert.Equal(t, string(expected.Data), string(yielded.Data), eventNum)
 				assert.Equal(t, expected.Type, yielded.Type, eventNum)
-				assert.Equal(t, expected.LastEventID, yielded.LastEventID, eventNum)
+				assert.Equal(t, expected.EventID, yielded.EventID, eventNum)
 			}
 		}
 		idx++
 	}
 	assert.Equal(t, len(expected), idx, groupLabel+": correct # of events generated")
 
-	waitGroup.Wait()
-	assert.NoError(t, protocolError, groupLabel+": no error")
-	return protocol, protocolError
+	return protocol
 }
 
 var specExampleStreams = []streamTestCase{
@@ -143,6 +130,6 @@ func TestRetry(t *testing.T) {
 		stream:   []byte("retry: 10000\ndata: hello world\n\n"),
 		expected: []*Event{{Type: "message", Data: []byte(`hello world`)}},
 	}
-	protocol, _ := assertEmitsEvents(t, retryTest.expected, retryTest.stream, "retry test")
+	protocol := assertEmitsEvents(t, retryTest.expected, retryTest.stream, "retry test")
 	assert.Equal(t, 10*time.Second, protocol.Retry)
 }
