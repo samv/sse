@@ -55,11 +55,11 @@ func NewEventSink(w http.ResponseWriter, feed EventFeed) (*EventSink, error) {
 	}
 
 	// Listen to the closing of the http connection via the CloseNotifier
-	if closeNotifier, ok := sink.w.(http.CloseNotifier); ok {
-		sink.closeNotify = closeNotifier.CloseNotify()
-	} else {
+	closeNotifier, ok := sink.w.(http.CloseNotifier)
+	if !ok {
 		return nil, fmt.Errorf("ResponseWriter %v does not implement http.CloseNotifier", w)
 	}
+	sink.closeNotify = closeNotifier.CloseNotify()
 
 	// pass the message via channel-close semantics
 	sink.closedChan = make(chan struct{})
