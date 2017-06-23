@@ -74,6 +74,9 @@ func (jea *jsonEncoderFeed) GetEventChan(clientCloseChan <-chan struct{}) <-chan
 	return eventChan
 }
 
+// SinkJSONEvents is a wrapped-up handler for responding with anything
+// that encoding/json can marshal, that you can happily `return` to in
+// a net/http handler.
 func SinkJSONEvents(w http.ResponseWriter, code int, feed AnyEventFeed) error {
 	return SinkEvents(w, code, NewJSONEncoderFeed(feed))
 }
