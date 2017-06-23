@@ -129,17 +129,16 @@ func (sink *EventSink) safeClose() {
 }
 
 func (sink *EventSink) sinkEvent(event SinkEvent) error {
-
 	var writeErr error
+	eventBody, dataErr := event.GetData()
+	if dataErr != nil {
+		Logger.Printf("Error marshaling a %T (%v) via GetData; %v", event, event, dataErr)
+	}
 
-	if writeErr == nil {
-		eventBody, _ := event.GetData() // FIXME - surface an error here
-
-		// returning an empty interface value permits options like keepalive and retry
-		// to be passed down the channel without generating a wire event
-		if len(eventBody) != 0 {
-			writeErr = writeDataLines(sink.w, eventBody)
-		}
+	// returning an empty interface value permits options like keepalive and retry
+	// to be specified without generating an actual event
+	if len(eventBody) != 0 {
+		writeErr = writeDataLines(sink.w, eventBody)
 	}
 
 	// a newline delimits events, but is also safe to send if no event was sent.
