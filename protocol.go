@@ -35,7 +35,7 @@ func newEventStreamReader(reader io.Reader, origin string) *eventStreamReader {
 	}
 }
 
-func (decoder *eventStreamReader) decode(events chan<- *Event) {
+func (decoder *eventStreamReader) decode(events chan<- *Event) error {
 	scanner := bufio.NewScanner(decoder.reader)
 	scanner.Split(SplitFunc())
 
@@ -156,6 +156,10 @@ func (decoder *eventStreamReader) decode(events chan<- *Event) {
 	}
 	dispatch()
 	close(events)
+
+	// the SSE spec defines all garbage input as valid; eventually we'll
+	// implement saner garbage detection.
+	return nil
 }
 
 func (decoder *eventStreamReader) decodeChan() <-chan *Event {
