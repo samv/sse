@@ -1,11 +1,13 @@
 package sse
 
 import (
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -29,6 +31,9 @@ type SSEClient struct {
 	// all state changes are guarded by this
 	sync.Mutex
 
+	// for clean shutdown
+	wg sync.WaitGroup
+
 	// info of the request.  The SSE spec only allows GET requests and no body!
 	url    *url.URL
 	origin string
@@ -44,13 +49,21 @@ type SSEClient struct {
 	reader      *eventStreamReader
 	readerError error
 	eventStream chan *Event
+
+	// whether to reconnect and after what time
+	reconnect     bool
+	reconnectTime time.Duration
+
+	canceler
 }
 
 // NewSSEClient creates a new client which can make a single SSE call.
 func NewSSEClient() *SSEClient {
 	ssec := &SSEClient{
-		readyState: int32(Connecting),
+		readyState:    int32(Connecting),
+		reconnectTime: time.Second,
 	}
+	ssec.initTransport()
 	return ssec
 }
 
@@ -62,6 +75,7 @@ func (ssec *SSEClient) GetStream(uri string) error {
 	if ssec.url, err = url.Parse(uri); err != nil {
 		return errors.Wrap(err, "error parsing URL")
 	}
+	ssec.wg.Add(1)
 	go ssec.process()
 	return err
 }
@@ -73,6 +87,7 @@ func (ssec *SSEClient) makeRequest() (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+	request = ssec.wrapRequest(request)
 
 	request.Header.Set("Accept", "text/event-stream")
 	return request, nil
@@ -82,12 +97,12 @@ func (ssec *SSEClient) connect() error {
 	var err error
 	var req *http.Request
 	if req, err = ssec.makeRequest(); err != nil {
-		return err
+		return errors.Wrap(err, "error making request")
 	}
 
 	ssec.response, err = ssec.Client.Do(req)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error fetching URL")
 	}
 	ssec.origin = makeOrigin(ssec.response.Request.URL)
 	switch ssec.response.StatusCode {
@@ -132,6 +147,29 @@ func (ssec *SSEClient) connect() error {
 	return err
 }
 
+func (ssec *SSEClient) setReconnect(should bool) (changed bool) {
+	ssec.Lock()
+	changed = (should != ssec.reconnect)
+	ssec.reconnect = false
+	ssec.Unlock()
+	return
+}
+
+// Reopen allows a connection which was closed to be re-opened again.
+func (ssec *SSEClient) Reopen() {
+	if ssec.setReconnect(true) {
+		ssec.wg.Add(1)
+		go ssec.process()
+	}
+}
+
+func (ssec *SSEClient) shouldReconnect() bool {
+	ssec.Lock()
+	should := ssec.reconnect
+	ssec.Unlock()
+	return should
+}
+
 // URL returns the configured URL of the client
 func (ssec *SSEClient) URL() *url.URL {
 	ssec.Lock()
@@ -149,22 +187,37 @@ func (ssec *SSEClient) readStream() {
 func (ssec *SSEClient) process() {
 	for {
 		if atomic.LoadInt32(&ssec.readyState) == int32(Connecting) {
+			log.Printf("connecting to %s", ssec.url)
 			err := ssec.connect()
 			if err != nil {
+				log.Printf("error; state=closed: %s", err)
 				atomic.StoreInt32(&ssec.readyState, int32(Closed))
 				ssec.connectError = err
 				break
 			} else {
 				atomic.StoreInt32(&ssec.readyState, int32(Open))
+				log.Printf("connected; state=open: %s", err)
 				go ssec.readStream()
 			}
 		}
 		select {
-		case _, ok := <-ssec.eventStream:
-			if !ok {
+		case ev, ok := <-ssec.eventStream:
+			if ok {
+				log.Printf("event; state=open: %v", ev)
+			} else {
 				ssec.response.Body.Close()
 				ssec.response = nil
+				if ssec.reconnectTime > time.Duration(0) {
+					time.Sleep(ssec.reconnectTime)
+				}
+				if ssec.shouldReconnect() {
+					atomic.StoreInt32(&ssec.readyState, int32(Connecting))
+					if ssec.reconnectTime > time.Duration(0) {
+						time.Sleep(ssec.reconnectTime)
+					}
+				}
 			}
 		}
 	}
+	ssec.wg.Done()
 }

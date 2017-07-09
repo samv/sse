@@ -13,19 +13,21 @@
 **** last-event-id tracking
 ** EventSource API
 *** add event channel
-*** messages routing
-*** open message routing
-*** errors routing
+*** TODO messages routing
+*** TODO open message routing
+*** TODO errors routing
+*** DONE client hang-up
 *** add event listener
 
 ** Optional features:
 *** DONE reader support
+*** TODO relative URLs
+*** DONE context cancellation
 *** buffering selection
-*** context cancellation
 *** relative URLs
 *** POST support
 *** no connect on create
-
+    
 * Test strategies
 ** DONE "service layer" testing - reader in, events out
 ** in-process basic server tests

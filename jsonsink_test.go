@@ -3,6 +3,7 @@ package sse
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -77,12 +78,16 @@ func TestJSONSink(t *testing.T) {
 	assert.False(t, evFeed.isClosed())
 
 	// response writer closes (it still receives data though, convenient for this test)
+	time.Sleep(100 * time.Millisecond)
+	Logger.Print("Closing Response Writer")
 	rw.Close()
 
 	// this step is only necessary because this mock feed is not its own goroutine.
+	Logger.Print("event feed wait")
 	evFeed.wait()
 	assert.True(t, evFeed.isClosed())
 
+	Logger.Print("Waiting for sink to exit")
 	// test that the sink exits
 	sinkDone.Wait()
 

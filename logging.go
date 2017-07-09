@@ -1,6 +1,7 @@
 package sse
 
 import (
+	"io"
 	"io/ioutil"
 	"log"
 )
@@ -14,4 +15,5 @@ type StdLogger interface {
 	Print(v ...interface{})
 	Printf(format string, v ...interface{})
 	Println(v ...interface{})
+	SetOutput(w io.Writer)
 }

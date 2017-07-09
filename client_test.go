@@ -5,11 +5,19 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/samv/sse"
 )
+
+func init() {
+	if os.Getenv("debug") != "" {
+		sse.Logger.SetOutput(os.Stderr)
+	}
+}
 
 // testSSEServer is a simple server that streams events and cannot
 // (sensibly) handle more than one connection at a time
@@ -22,6 +30,8 @@ type testSSEServer struct {
 }
 
 func (testServer *testSSEServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Printf("hit from %s; url=%s header=%v", r.RemoteAddr, r.URL, r.Header)
+	defer log.Printf("testServer: hit from %s done", r.RemoteAddr)
 	if err := sse.SinkJSONEvents(w, 200, testServer); err != nil {
 		// I hereby declare the various Sink* functions will only return an error if no response
 		// has yet been written.
@@ -40,11 +50,11 @@ func (testServer *testSSEServer) watchClose() {
 	for {
 		_, ok := <-testServer.closedChan
 		if !ok {
-			log.Printf("Close client connections")
+			log.Printf("testServer: closing client connections")
 			testServer.Server.CloseClientConnections()
-			log.Printf("Close server")
+			log.Printf("testServer: closing server")
 			testServer.Server.Close()
-			log.Printf("done")
+			log.Printf("testServer: done")
 			testServer.wg.Done()
 			return
 		}
@@ -71,6 +81,7 @@ func newTestSSEServer() *testSSEServer {
 	return testServer
 }
 
+// TestClientConnect tests that a client can connect to the server, and close again.
 func TestClientConnect(t *testing.T) {
 	testServer := newTestSSEServer()
 	testServer.Start()
@@ -80,10 +91,14 @@ func TestClientConnect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to SSE server: %v", err)
 	}
+	log.Printf("clientTest: sinking message")
 	testServer.objectFeed <- map[string]interface{}{"hello": "realtime"}
 
-	// client.Close()
-	// hangs
-	//testServer.Stop()
-	//log.Printf("stopped")
+	time.Sleep(100 * time.Millisecond)
+	client.Close()
+	log.Printf("clientTest: closed client")
+
+	//hangs
+	testServer.Stop()
+	log.Printf("stopped")
 }

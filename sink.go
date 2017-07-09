@@ -79,6 +79,7 @@ func (sink *EventSink) Respond(code int) {
 
 	sink.w.WriteHeader(code)
 	sink.flusher.Flush()
+	Logger.Printf("Responded with code=%d", code)
 }
 
 func (sink *EventSink) closeFeed() {
@@ -96,8 +97,7 @@ sinkLoop:
 	for {
 		select {
 		case <-sink.closeNotify:
-			sink.closeFeed()
-			// wait for eventFeed to empty/close instead of breaking out here
+			break sinkLoop
 
 		case event, ok := <-sink.feed:
 			if !ok {
@@ -105,27 +105,15 @@ sinkLoop:
 				break sinkLoop
 			}
 			if sinkErr = sink.sinkEvent(event); sinkErr != nil {
-				sink.closeFeed()
+				Logger.Printf("error sinking event: %v", sinkErr)
+				break sinkLoop
+			} else {
+				Logger.Printf("sank Event: %v", event)
 			}
 		}
 	}
-	sink.safeClose()
-	return sinkErr
-}
-
-// prevent deadlocks by emptying channels instead of letting them block on write
-func (sink *EventSink) safeClose() {
 	sink.closeFeed()
-	if sink.feed != nil {
-		go func() {
-			for {
-				_, ok := <-sink.feed
-				if !ok {
-					break
-				}
-			}
-		}()
-	}
+	return sinkErr
 }
 
 func (sink *EventSink) sinkEvent(event SinkEvent) error {

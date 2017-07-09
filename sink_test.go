@@ -29,6 +29,7 @@ const JIFFY = time.Nanosecond
 
 // GetEventChan satisfies the EventFeed interface
 func (evf *mockEventFeed) GetEventChan(closedChan <-chan struct{}) <-chan SinkEvent {
+	Logger.Printf("got event chan.")
 	evf.closedChan = closedChan
 	return evf.evChan
 }
@@ -60,10 +61,12 @@ func (evf *mockEventFeed) wait() {
 }
 
 func TestSink(t *testing.T) {
+	Logger.Println("a")
 	rw := mock.NewResponseWriter()
 
 	evFeed := newMockEventFeed(1)
 
+	Logger.Println("b")
 	sink, err := NewEventSink(rw, evFeed)
 	if !assert.NoError(t, err) {
 		return
@@ -71,6 +74,7 @@ func TestSink(t *testing.T) {
 
 	sink.Respond(200)
 
+	Logger.Println("c")
 	var sinkDone sync.WaitGroup
 	go func() {
 		sinkDone.Add(1)
@@ -105,8 +109,9 @@ func TestSink(t *testing.T) {
 	assertEmitsEvents(t, expected, responseBytes, "TestSink basic")
 }
 
+// TestSinkDrains checks that a Sink will provide channel backpressure when closed
 func TestSinkDrains(t *testing.T) {
-	evFeed := newMockEventFeed(16)
+	evFeed := newMockEventFeed(0)
 	rw := mock.NewResponseWriter()
 	sink, err := NewEventSink(rw, evFeed)
 	if !assert.NoError(t, err) {
@@ -114,6 +119,7 @@ func TestSinkDrains(t *testing.T) {
 	}
 	sink.Respond(200)
 
+	// start a sink and feed it some stuff
 	var sinkDone sync.WaitGroup
 	go func() {
 		sinkDone.Add(1)
@@ -141,7 +147,11 @@ func TestSinkDrains(t *testing.T) {
 	for _ = range protocol.decodeChan() {
 		eventCount++
 	}
+	Logger.Printf("Read %d event(s)", eventCount)
 
-	assert.True(t, eventCount >= 50, "TestSinkDrains - wrote 50 messages ok")
-	assert.True(t, eventCount < 100, "TestSinkDrains - cut off before all messages written")
+	if eventCount < 50 {
+		t.Errorf("Not enough events written; expected 50, saw %d", eventCount)
+	} else if eventCount == 100 {
+		t.Error("All events written, bad test")
+	}
 }
