@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"testing/iotest"
 	"time"
 
 	"github.com/pkg/errors"
@@ -248,12 +249,16 @@ func (ssec *SSEClient) emitOpenClose(which bool) {
 // one error returned before you reset the client (via Reopen())
 func (ssec *SSEClient) Errors() <-chan error {
 	ssec.demand(WantErrors)
+	Logger.Printf("Errors demanded, %v", ssec.errorChan)
 	return ssec.errorChan
 }
 
 func (ssec *SSEClient) emitError(err error) {
 	if ssec.wants(WantErrors) {
+		Logger.Printf("Writing error: %v", err)
 		ssec.errorChan <- err
+	} else {
+		Logger.Printf("Skipping error: %v", err)
 	}
 	packagedError := &Event{
 		Origin: ssec.origin, // not entirely true - might be the wrong thing
@@ -326,4 +331,5 @@ processLoop:
 	close(ssec.openChan)
 	close(ssec.errorChan)
 	ssec.wg.Done()
+	Logger.Print("outta here like Vladimir")
 }

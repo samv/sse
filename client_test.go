@@ -227,6 +227,7 @@ func TestClientError(t *testing.T) {
 	timer := time.NewTimer(100 * time.Millisecond)
 	select {
 	case err, ok := <-client.Errors():
+		log.Printf("Read an error? err=%v (%T) ok=%v", err, err, ok)
 		if ok {
 			readError = err
 		} else {
@@ -247,8 +248,8 @@ func TestClientError(t *testing.T) {
 		t.Fatalf("Expected '403' in %s", readError.Error())
 	}
 
+	log.Printf("clientTest: closing client")
 	client.Close()
-	log.Printf("clientTest: closed client")
 
 	//hangs
 	testServer.Stop()
