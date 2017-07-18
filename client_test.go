@@ -76,6 +76,7 @@ func (testServer *testSSEServer) Stop() {
 }
 
 func (testServer *testSSEServer) GetEventChan(clientCloseChan <-chan struct{}) <-chan interface{} {
+	log.Printf("returning eventChan: %v (close=%v)", testServer.objectFeed, clientCloseChan)
 	testServer.clientCloseChan = clientCloseChan
 	return testServer.objectFeed
 }
@@ -146,9 +147,11 @@ func TestClientOpenClose(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 		testServer.objectFeed = make(chan interface{})
 		testServer.Server.CloseClientConnections()
+		log.Printf("clientTest: connections closed")
 		time.Sleep(100 * time.Millisecond)
 		log.Printf("clientTest: sinking second message")
 		testServer.objectFeed <- map[string]interface{}{"two": "messages"}
+		log.Printf("clientTest: sunk")
 	}()
 
 	var messages []interface{}
