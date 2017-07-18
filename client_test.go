@@ -1,7 +1,7 @@
 package sse_test
 
-// test scenarios:
 import (
+	"bytes"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -94,7 +94,26 @@ func TestClientConnect(t *testing.T) {
 	log.Printf("clientTest: sinking message")
 	testServer.objectFeed <- map[string]interface{}{"hello": "realtime"}
 
-	time.Sleep(100 * time.Millisecond)
+	var readEvent *sse.Event
+
+	timer := time.NewTimer(100 * time.Millisecond)
+	select {
+	case ev, ok := <-client.Messages():
+		if ok {
+			readEvent = ev
+		} else {
+			t.Error("Client read early EOF")
+		}
+	case <-timer.C:
+	}
+
+	if readEvent == nil {
+		t.Fatal("Failed to read event via client")
+	}
+	if bytes.Index(readEvent.Data, []byte("realtime")) < 0 {
+		t.Errorf("Event wasn't what was expected, saw: %v", string(readEvent.Data))
+	}
+
 	client.Close()
 	log.Printf("clientTest: closed client")
 
@@ -103,6 +122,7 @@ func TestClientConnect(t *testing.T) {
 	log.Printf("stopped")
 }
 
+// test scenarios:
 //  "happy" case - connect to a server
 //    * client reading just messages
 //    * client watching errors

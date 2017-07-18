@@ -1,7 +1,6 @@
 package sse
 
 import (
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -45,8 +44,7 @@ type SSEClient struct {
 	origin string
 
 	// current state of the client
-	readyState   int32
-	connectError error
+	readyState int32
 
 	// current SSE response, if connected
 	response *http.Response
@@ -215,9 +213,22 @@ func (ssec *SSEClient) demand(what WantFlag) {
 	}
 }
 
+// Messages returns a channel from which events can be read
 func (ssec *SSEClient) Messages() <-chan *Event {
 	ssec.demand(WantMessages)
 	return ssec.messageChan
+}
+
+func (ssec *SSEClient) emit(event *Event) {
+	// only send "message" events down the Messages() channel
+	switch event.Type {
+	case MessageType:
+		if ssec.wants(WantMessages) {
+			ssec.messageChan <- event
+		}
+	case ErrorType:
+	default:
+	}
 }
 
 func (ssec *SSEClient) Opens() <-chan bool {
@@ -225,9 +236,21 @@ func (ssec *SSEClient) Opens() <-chan bool {
 	return ssec.openChan
 }
 
+func (ssec *SSEClient) emitOpenClose(which bool) {
+	if ssec.wants(WantOpenClose) {
+		ssec.openChan <- which
+	}
+}
+
 func (ssec *SSEClient) Errors() <-chan error {
 	ssec.demand(WantErrors)
 	return ssec.errorChan
+}
+
+func (ssec *SSEClient) emitError(err error) {
+	if ssec.wants(WantErrors) {
+		ssec.errorChan <- err
+	}
 }
 
 // URL returns the configured URL of the client
@@ -241,29 +264,32 @@ func (ssec *SSEClient) URL() *url.URL {
 func (ssec *SSEClient) readStream() {
 	ssec.eventStream = make(chan *Event)
 	ssec.reader = newEventStreamReader(ssec.response.Body, ssec.origin)
-	ssec.readerError = ssec.reader.decode(ssec.eventStream)
+	go ssec.reader.decode(ssec.eventStream)
 }
 
 func (ssec *SSEClient) process() {
 	for {
 		if atomic.LoadInt32(&ssec.readyState) == int32(Connecting) {
-			log.Printf("connecting to %s", ssec.url)
+			Logger.Printf("connecting to %s", ssec.url)
 			err := ssec.connect()
 			if err != nil {
-				log.Printf("error; state=closed: %s", err)
+				Logger.Printf("error; state=closed: %s", err)
 				atomic.StoreInt32(&ssec.readyState, int32(Closed))
-				ssec.connectError = err
+				ssec.emitError(err)
 				break
 			} else {
 				atomic.StoreInt32(&ssec.readyState, int32(Open))
-				log.Printf("connected; state=open: %s", err)
-				go ssec.readStream()
+				Logger.Printf("connected; state=open: %s", err)
+				ssec.readStream()
 			}
 		}
+		Logger.Printf("ready for an event - reading from %v", ssec.eventStream)
 		select {
 		case ev, ok := <-ssec.eventStream:
+			Logger.Printf("ev = %v, ok = %v", ev, ok)
 			if ok {
-				log.Printf("event; state=open: %v", ev)
+				Logger.Printf("event; state=open: %v", ev)
+				ssec.emit(ev)
 			} else {
 				ssec.response.Body.Close()
 				ssec.response = nil
@@ -279,5 +305,9 @@ func (ssec *SSEClient) process() {
 			}
 		}
 	}
+	Logger.Print("all done in process")
+	close(ssec.messageChan)
+	close(ssec.openChan)
+	close(ssec.errorChan)
 	ssec.wg.Done()
 }

@@ -34,6 +34,8 @@ var testCases = [][]string{
 	[]string{":test\r\rid:\rid\r",
 		":", "test", "\n", "\n", "id", ": ", "\n", "id", "\n"},
 	[]string{"data:", "data", ": "},
+	[]string{`data: {"hello":"realtime"}` + "\n\n",
+		"data", ": ", `{"hello":"realtime"}`, "\n"},
 }
 
 func TestScannerHappy(t *testing.T) {
