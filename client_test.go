@@ -50,6 +50,7 @@ func (testServer *testSSEServer) Poison() {
 func (testServer *testSSEServer) Start() string {
 	testServer.Server = httptest.NewServer(testServer)
 	testServer.wg.Add(1)
+	testServer.closedChan = make(chan struct{})
 	go testServer.watchClose()
 	return testServer.Server.URL
 }
@@ -80,11 +81,9 @@ func (testServer *testSSEServer) GetEventChan(clientCloseChan <-chan struct{}) <
 }
 
 func newTestSSEServer() *testSSEServer {
-	closedChan := make(chan struct{})
 	events := make(chan interface{})
 	testServer := &testSSEServer{
 		objectFeed: events,
-		closedChan: closedChan,
 	}
 	return testServer
 }
@@ -126,6 +125,82 @@ func TestClientConnect(t *testing.T) {
 	log.Printf("clientTest: closed client")
 
 	//hangs
+	testServer.Stop()
+	log.Printf("stopped")
+}
+
+// TestClientOpenClose tests that clients can notice connections
+// opening and closing
+func TestClientOpenClose(t *testing.T) {
+	testServer := newTestSSEServer()
+	testServer.Start()
+
+	client := sse.NewSSEClient(sse.ReconnectTime(10 * time.Millisecond))
+	err := client.GetStream(testServer.Server.URL)
+	if err != nil {
+		t.Fatalf("Failed to connect to SSE server: %v", err)
+	}
+	go func() {
+		log.Printf("clientTest: sinking message")
+		testServer.objectFeed <- map[string]interface{}{"one": "message"}
+		time.Sleep(50 * time.Millisecond)
+		testServer.objectFeed = make(chan interface{})
+		testServer.Server.CloseClientConnections()
+		time.Sleep(100 * time.Millisecond)
+		log.Printf("clientTest: sinking second message")
+		testServer.objectFeed <- map[string]interface{}{"two": "messages"}
+	}()
+
+	var messages []interface{}
+	var opens, closes int
+
+	timer := time.NewTimer(2 * time.Second)
+testLoop:
+	for {
+		select {
+		case err, ok := <-client.Errors():
+			if ok {
+				t.Fatalf("Read an error: %v", err)
+			}
+		case open, ok := <-client.Opens():
+			if ok {
+				if open {
+					log.Printf("clientTest: channel open")
+					opens++
+				} else {
+					log.Printf("clientTest: channel closed")
+					closes++
+				}
+			}
+		case msg, ok := <-client.Messages():
+			if ok {
+				log.Printf("clientTest: read a message: %v", msg)
+				messages = append(messages, msg)
+				if len(messages) > 1 {
+					timer.Reset(time.Millisecond)
+				}
+			} else {
+				log.Printf("clientTest: messages channel closed")
+				break testLoop
+			}
+		case <-timer.C:
+			break testLoop
+		}
+	}
+
+	if len(messages) != 2 {
+		t.Errorf("Expected 2 messages, saw %d", len(messages))
+	}
+	if opens != 2 {
+		t.Errorf("Expected 2 opens, saw %d", opens)
+	}
+	if closes != 1 {
+		t.Errorf("Expected 1 close, saw %d", closes)
+	}
+
+	client.Close()
+	log.Printf("clientTest: closed client again")
+
 	testServer.Stop()
 	log.Printf("stopped")
 }

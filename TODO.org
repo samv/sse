@@ -15,7 +15,7 @@
 ** EventSource API
 *** add event channel
 *** DONE messages routing
-*** TODO open message routing
+*** DONE open message routing
 *** DONE errors routing
 *** DONE client hang-up
 *** add event listener

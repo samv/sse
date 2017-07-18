@@ -75,6 +75,7 @@ func NewSSEClient(options ...ConfigOption) *SSEClient {
 	ssec := &SSEClient{
 		readyState:    int32(Connecting),
 		reconnectTime: time.Second,
+		reconnect:     true,
 	}
 	for _, option := range options {
 		option.Apply(ssec)
@@ -277,6 +278,7 @@ func (ssec *SSEClient) readStream() {
 }
 
 func (ssec *SSEClient) process() {
+processLoop:
 	for {
 		if atomic.LoadInt32(&ssec.readyState) == int32(Connecting) {
 			Logger.Printf("connecting to %s", ssec.url)
@@ -285,31 +287,33 @@ func (ssec *SSEClient) process() {
 				Logger.Printf("error; state=closed: %s", err)
 				atomic.StoreInt32(&ssec.readyState, int32(Closed))
 				ssec.emitError(err)
-				break
+				break processLoop
 			} else {
 				atomic.StoreInt32(&ssec.readyState, int32(Open))
 				Logger.Printf("connected; state=open: %s", err)
+				ssec.emitOpenClose(true)
 				ssec.readStream()
 			}
 		}
-		Logger.Printf("ready for an event - reading from %v", ssec.eventStream)
+		// Logger.Printf("ready for an event - reading from %v", ssec.eventStream)
 		select {
 		case ev, ok := <-ssec.eventStream:
-			Logger.Printf("ev = %v, ok = %v", ev, ok)
+			// Logger.Printf("ev = %v, ok = %v", ev, ok)
 			if ok {
 				Logger.Printf("event; state=open: %v", ev)
 				ssec.emit(ev)
 			} else {
-				//ssec.response.Body.Close()
+				// TODO - do we need to clean this up? ssec.response.Body.Close()
+				ssec.emitOpenClose(false)
 				ssec.response = nil
-				if ssec.reconnectTime > time.Duration(0) {
-					time.Sleep(ssec.reconnectTime)
-				}
 				if ssec.shouldReconnect() {
+					Logger.Printf("detected close; reconnecting in %v", ssec.reconnectTime)
 					atomic.StoreInt32(&ssec.readyState, int32(Connecting))
 					if ssec.reconnectTime > time.Duration(0) {
 						time.Sleep(ssec.reconnectTime)
 					}
+				} else {
+					break processLoop
 				}
 			}
 		}
