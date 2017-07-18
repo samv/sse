@@ -56,11 +56,12 @@ func (decoder *eventStreamReader) decode(events chan<- *Event) error {
 			// LINE FEED (LF) character, then remove the last
 			// character from the data buffer.
 			data := data.Bytes()
-			if data[len(data)-1] == '\n' {
-				data = data[:len(data)-1]
+			dataLen := len(data)
+			if data[dataLen-1] == '\n' {
+				dataLen--
 			}
-			eventData := make([]byte, len(data))
-			copy(eventData, data)
+			eventData := make([]byte, dataLen)
+			copy(eventData, data[:dataLen])
 			// Otherwise, create an event that uses the
 			// `MessageEvent` interface, with the event name
 			// `message`...
