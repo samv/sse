@@ -9,13 +9,14 @@
 **** DONE connection
 **** reconnection
 **** retry negotiation
+**** DONE connection errors
 **** origin tracking
 **** last-event-id tracking
 ** EventSource API
 *** add event channel
 *** DONE messages routing
 *** TODO open message routing
-*** TODO errors routing
+*** DONE errors routing
 *** DONE client hang-up
 *** add event listener
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -27,16 +28,23 @@ type testSSEServer struct {
 	clientCloseChan <-chan struct{}
 	wg              sync.WaitGroup
 	Server          *httptest.Server
+	poisoned        bool
 }
 
 func (testServer *testSSEServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("hit from %s; url=%s header=%v", r.RemoteAddr, r.URL, r.Header)
 	defer log.Printf("testServer: hit from %s done", r.RemoteAddr)
-	if err := sse.SinkJSONEvents(w, 200, testServer); err != nil {
+	if testServer.poisoned {
+		http.Error(w, "Who are you? Crank caller!", http.StatusForbidden)
+	} else if err := sse.SinkJSONEvents(w, 200, testServer); err != nil {
 		// I hereby declare the various Sink* functions will only return an error if no response
 		// has yet been written.
 		http.Error(w, "failed to sink JSON events", http.StatusInternalServerError)
 	}
+}
+
+func (testServer *testSSEServer) Poison() {
+	testServer.poisoned = true
 }
 
 func (testServer *testSSEServer) Start() string {
@@ -121,6 +129,67 @@ func TestClientConnect(t *testing.T) {
 	testServer.Stop()
 	log.Printf("stopped")
 }
+
+// TestClientError tests that clients can read connection errors
+// This test may be timing dependent.
+func TestClientError(t *testing.T) {
+	testServer := newTestSSEServer()
+	testServer.Start()
+	testServer.Poison()
+
+	client := sse.NewSSEClient()
+	err := client.GetStream(testServer.Server.URL)
+	if err != nil {
+		t.Fatalf("Failed to connect to SSE server: %v", err)
+	}
+	log.Printf("clientTest: sinking message")
+	go func() {
+		testServer.objectFeed <- map[string]interface{}{"hello": "realtime"}
+	}()
+
+	var readError error
+
+	timer := time.NewTimer(100 * time.Millisecond)
+	select {
+	case err, ok := <-client.Errors():
+		if ok {
+			readError = err
+		} else {
+			t.Error("Read Errors close unexpectedly")
+		}
+	case _, ok := <-client.Messages():
+		if ok {
+			t.Error("Read Message unexpectedly")
+		}
+	case <-timer.C:
+		t.Error("test timed out")
+	}
+
+	if readError == nil {
+		t.Fatal("Failed to read error via client")
+	}
+	if strings.Index(readError.Error(), "403") < 0 {
+		t.Fatalf("Expected '403' in %s", readError.Error())
+	}
+
+	client.Close()
+	log.Printf("clientTest: closed client")
+
+	//hangs
+	testServer.Stop()
+	log.Printf("stopped")
+}
+
+// test scenarios:
+//  "happy" case - connect to a server
+//    * client reading just messages
+//    * client watching errors
+//    * client watching for "open"
+
+//  "reconnect" cases -
+//    * reconnects by default
+//    * with a negotiated retry
+//    * client watching for "closed"
 
 // test scenarios:
 //  "happy" case - connect to a server

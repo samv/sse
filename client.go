@@ -242,6 +242,9 @@ func (ssec *SSEClient) emitOpenClose(which bool) {
 	}
 }
 
+// Errors returns a channel from which errors will be returned.  As an
+// error indicates that the SSE channel is closed, there will only be
+// one error returned before you reset the client (via Reopen())
 func (ssec *SSEClient) Errors() <-chan error {
 	ssec.demand(WantErrors)
 	return ssec.errorChan
@@ -251,6 +254,12 @@ func (ssec *SSEClient) emitError(err error) {
 	if ssec.wants(WantErrors) {
 		ssec.errorChan <- err
 	}
+	packagedError := &Event{
+		Origin: ssec.origin, // not entirely true - might be the wrong thing
+		Error:  err,
+		Type:   ErrorType,
+	}
+	ssec.emit(packagedError)
 }
 
 // URL returns the configured URL of the client
@@ -291,7 +300,7 @@ func (ssec *SSEClient) process() {
 				Logger.Printf("event; state=open: %v", ev)
 				ssec.emit(ev)
 			} else {
-				ssec.response.Body.Close()
+				//ssec.response.Body.Close()
 				ssec.response = nil
 				if ssec.reconnectTime > time.Duration(0) {
 					time.Sleep(ssec.reconnectTime)
