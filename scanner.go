@@ -45,7 +45,12 @@ func newSplitter() *parseState {
 func SplitFunc() func([]byte, bool) (int, []byte, error) {
 	dfa := newSplitter()
 	return func(data []byte, atEOF bool) (int, []byte, error) {
-		return dfa.scan(data, atEOF)
+		beforeState := *dfa
+		bytesRead, token, err := dfa.scan(data, atEOF)
+		afterState := *dfa
+		Logger.Printf("Scan: %v=>%v; bytes=%d, token=%s, err=%v",
+			beforeState, afterState, bytesRead, token, err)
+		return bytesRead, token, err
 	}
 }
 

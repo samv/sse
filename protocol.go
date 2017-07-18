@@ -74,6 +74,8 @@ func (decoder *eventStreamReader) decode(events chan<- *Event) error {
 				Data:    eventData,
 				Type:    eventName,
 			}
+
+			Logger.Printf("writing an event to %v: %+v", events, event)
 			events <- event
 		}
 		eventName = ""
@@ -84,6 +86,7 @@ func (decoder *eventStreamReader) decode(events chan<- *Event) error {
 	// follows:
 	for scanner.Scan() {
 		token := scanner.Bytes()
+		Logger.Printf("Read a token: %v (%d byte(s))", token, len(token))
 		switch {
 		case bytes.Equal(token, endOfLine):
 			// If the line is empty (a blank line)
@@ -104,6 +107,7 @@ func (decoder *eventStreamReader) decode(events chan<- *Event) error {
 			var value []byte
 			var hasValue bool
 			if scanner.Scan() && bytes.Equal(scanner.Bytes(), fieldDelim) {
+				Logger.Printf("field has value: %v (%d byte(s))", scanner.Bytes(), len(scanner.Bytes()))
 				hasValue = true
 				if scanner.Scan() {
 					value = scanner.Bytes()
@@ -113,6 +117,7 @@ func (decoder *eventStreamReader) decode(events chan<- *Event) error {
 						// swallow the end of line
 						scanner.Scan()
 					}
+					Logger.Printf("value: %v (%d byte(s))", string(value), len(value))
 				}
 			}
 

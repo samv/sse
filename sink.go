@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/pkg/errors"
 )
 
 // EventFeed is a type for something that can return events in a form
@@ -123,6 +125,8 @@ func (sink *EventSink) sinkEvent(event SinkEvent) error {
 		Logger.Printf("Error marshaling a %T (%v) via GetData; %v", event, event, dataErr)
 	}
 
+	Logger.Printf("Sinking body: %v", string(eventBody))
+
 	// returning an empty interface value permits options like keepalive and retry
 	// to be specified without generating an actual event
 	if len(eventBody) != 0 {
@@ -132,6 +136,7 @@ func (sink *EventSink) sinkEvent(event SinkEvent) error {
 	// a newline delimits events, but is also safe to send if no event was sent.
 	if writeErr == nil {
 		_, writeErr = sink.w.Write(endOfLine)
+		Logger.Printf("wrote: %v, err = %v", endOfLine, writeErr)
 		sink.flusher.Flush()
 	}
 
@@ -144,23 +149,26 @@ func (sink *EventSink) sinkEvent(event SinkEvent) error {
 func writeDataLines(w io.Writer, data []byte) error {
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	var err error
+	var buf bytes.Buffer
 	for (err == nil) && scanner.Scan() {
 		line := scanner.Bytes()
+		Logger.Printf("line: %v", string(line))
 		// I care more about SSE protocol conformance than junk input;
 		// throw away everything from the first \r on the line
 		if pos := bytes.IndexRune(line, '\r'); pos > -1 {
 			line = line[:pos]
 		}
-		_, err = w.Write(DataHeader)
-		if err == nil {
-			_, err = w.Write(fieldDelim)
-		}
-		if err == nil {
-			_, err = w.Write(line)
-		}
-		if err == nil {
-			_, err = w.Write(endOfLine)
-		}
+		buf.Write(DataHeader)
+		buf.Write(fieldDelim)
+		buf.Write(line)
+		buf.Write(endOfLine)
+	}
+	var written int
+	written, err = w.Write(buf.Bytes())
+	Logger.Printf("wrote: %v, err = %v", buf.String(), err)
+	if err == nil && (written != buf.Len()) {
+		return errors.Errorf("short write: asked to write %d, wrote %d byte(s)",
+			buf.Len(), written)
 	}
 	return err
 }

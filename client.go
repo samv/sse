@@ -273,7 +273,10 @@ func (ssec *SSEClient) URL() *url.URL {
 
 func (ssec *SSEClient) readStream() {
 	ssec.eventStream = make(chan *Event)
-	ssec.reader = newEventStreamReader(ssec.response.Body, ssec.origin)
+	ssec.reader = newEventStreamReader(
+		iotest.NewReadLogger("[ssein]", ssec.response.Body),
+		ssec.origin)
+	Logger.Print("decoding stream")
 	go ssec.reader.decode(ssec.eventStream)
 }
 
