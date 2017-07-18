@@ -233,6 +233,10 @@ func (ssec *SSEClient) emit(event *Event) {
 	}
 }
 
+// Opens returns a channel from which open/close notifications can be
+// read.  When the channel opens, you get an open event (the value
+// read will be true), and if it closes for temporary reasons you will
+// read a false value.
 func (ssec *SSEClient) Opens() <-chan bool {
 	ssec.demand(WantOpenClose)
 	return ssec.openChan
@@ -285,6 +289,8 @@ func (ssec *SSEClient) readStream() {
 	go ssec.reader.decode(ssec.eventStream)
 }
 
+// process is the main loop of the connection, though there is another
+// goroutine per connection decoding the stream.
 func (ssec *SSEClient) process() {
 processLoop:
 	for {
