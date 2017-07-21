@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-type ConfigOption interface {
+type ClientOption interface {
 	Apply(*SSEClient) error
 }
 
@@ -13,15 +13,20 @@ func (wf WantFlag) Apply(ssec *SSEClient) error {
 	return nil
 }
 
-type reconnectTime struct {
-	minDelay time.Duration
+type ReconnectTime time.Duration
+
+func (rt ReconnectTime) Apply(ssec *SSEClient) error {
+	ssec.reconnectTime = time.Duration(rt)
+	return nil
 }
 
-func ReconnectTime(minDelay time.Duration) ConfigOption {
-	return &reconnectTime{minDelay}
+type ServerOption interface {
+	Apply(*EventSink) error
 }
 
-func (rt reconnectTime) Apply(ssec *SSEClient) error {
-	ssec.reconnectTime = rt.minDelay
+type KeepAliveTime time.Duration
+
+func (kat KeepAliveTime) Apply(sink *EventSink) error {
+	sink.keepAliveTime = time.Duration(kat)
 	return nil
 }

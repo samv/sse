@@ -71,7 +71,7 @@ type SSEClient struct {
 }
 
 // NewSSEClient creates a new client which can make a single SSE call.
-func NewSSEClient(options ...ConfigOption) *SSEClient {
+func NewSSEClient(options ...ClientOption) *SSEClient {
 	ssec := &SSEClient{
 		readyState:    int32(Connecting),
 		reconnectTime: time.Second,

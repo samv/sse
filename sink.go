@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
+
+var keepAlive = []byte(":-)\n")
 
 // EventFeed is a type for something that can return events in a form
 // this API can write them to the write
@@ -28,13 +31,16 @@ type EventSink struct {
 	feed        <-chan SinkEvent
 	closeNotify <-chan bool
 	closedChan  chan struct{}
+
+	// how often to send a comment
+	keepAliveTime time.Duration
 }
 
 // SinkEvents is an more-or-less drop-in replacement for a responder
 // in a net/http response handler.  It handles all the SSE protocol
 // for you - just feed it events.
-func SinkEvents(w http.ResponseWriter, code int, feed EventFeed) error {
-	sink, err := NewEventSink(w, feed)
+func SinkEvents(w http.ResponseWriter, code int, feed EventFeed, options ...ServerOption) error {
+	sink, err := NewEventSink(w, feed, options...)
 	if err != nil {
 		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
 		return err
@@ -44,7 +50,7 @@ func SinkEvents(w http.ResponseWriter, code int, feed EventFeed) error {
 }
 
 // NewEventSink returns an Event
-func NewEventSink(w http.ResponseWriter, feed EventFeed) (*EventSink, error) {
+func NewEventSink(w http.ResponseWriter, feed EventFeed, options ...ServerOption) (*EventSink, error) {
 	sink := &EventSink{
 		w: w,
 	}
@@ -61,8 +67,20 @@ func NewEventSink(w http.ResponseWriter, feed EventFeed) (*EventSink, error) {
 	}
 	sink.closeNotify = closeNotifier.CloseNotify()
 
-	// pass the message via channel-close semantics
+	// set up keepalives, under 30 seconds by default
+	sink.keepAliveTime = 29 * time.Second
+
+	// use channel-close-for-teardown semantics
 	sink.closedChan = make(chan struct{})
+
+	// apply options
+	for _, option := range options {
+		if err := option.Apply(sink); err != nil {
+			return nil, err
+		}
+	}
+
+	// finally, establish the channel
 	sink.feed = feed.GetEventChan(sink.closedChan)
 
 	return sink, nil
@@ -93,6 +111,7 @@ func (sink *EventSink) closeFeed() {
 // provide the goroutine if required.
 func (sink *EventSink) Sink() error {
 	var sinkErr error
+	keepAliveTimer := time.NewTimer(sink.keepAliveTime)
 sinkLoop:
 	for {
 		select {
@@ -109,6 +128,12 @@ sinkLoop:
 				break sinkLoop
 			} else {
 				Logger.Printf("sank Event: %v", event)
+			}
+			keepAliveTimer.Reset(sink.keepAliveTime)
+
+		case <-keepAliveTimer.C:
+			if sinkErr = sink.keepAlive(); sinkErr != nil {
+				break sinkLoop
 			}
 		}
 	}
@@ -136,6 +161,14 @@ func (sink *EventSink) sinkEvent(event SinkEvent) error {
 	}
 
 	return writeErr
+}
+
+func (sink *EventSink) keepAlive() error {
+	_, err := sink.w.Write(keepAlive)
+	if err != nil {
+		sink.flusher.Flush()
+	}
+	return err
 }
 
 // writeDataLines writes the data as an SSE event, making sure not to

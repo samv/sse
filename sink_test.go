@@ -29,7 +29,6 @@ const JIFFY = time.Nanosecond
 
 // GetEventChan satisfies the EventFeed interface
 func (evf *mockEventFeed) GetEventChan(closedChan <-chan struct{}) <-chan SinkEvent {
-	Logger.Printf("got event chan.")
 	evf.closedChan = closedChan
 	return evf.evChan
 }
@@ -61,12 +60,10 @@ func (evf *mockEventFeed) wait() {
 }
 
 func TestSink(t *testing.T) {
-	Logger.Println("a")
 	rw := mock.NewResponseWriter()
 
 	evFeed := newMockEventFeed(1)
 
-	Logger.Println("b")
 	sink, err := NewEventSink(rw, evFeed)
 	if !assert.NoError(t, err) {
 		return
@@ -74,7 +71,6 @@ func TestSink(t *testing.T) {
 
 	sink.Respond(200)
 
-	Logger.Println("c")
 	var sinkDone sync.WaitGroup
 	go func() {
 		sinkDone.Add(1)
@@ -153,5 +149,37 @@ func TestSinkDrains(t *testing.T) {
 		t.Errorf("Not enough events written; expected 50, saw %d", eventCount)
 	} else if eventCount == 100 {
 		t.Error("All events written, bad test")
+	}
+}
+
+func TestSinkKeepAlive(t *testing.T) {
+	rw := mock.NewResponseWriter()
+	evFeed := newMockEventFeed(1)
+
+	sink, err := NewEventSink(rw, evFeed, KeepAliveTime(100*time.Millisecond))
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	sink.Respond(200)
+
+	var sinkDone sync.WaitGroup
+	go func() {
+		sinkDone.Add(1)
+		sink.Sink()
+		sinkDone.Done()
+	}()
+
+	time.Sleep(150 * time.Millisecond)
+	rw.Flush()
+	rw.Close()
+	evFeed.wait()
+	sinkDone.Wait()
+
+	// look for the keepalives
+	responseBytes := rw.ResponseBytes()
+	if len(responseBytes) == 0 || responseBytes[0] != ':' {
+		t.Errorf("Did not see keepalive in response: '%v' (%d byte(s))", string(rw.ResponseBytes()),
+			len(rw.ResponseBytes()))
 	}
 }
