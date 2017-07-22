@@ -129,13 +129,12 @@ sinkLoop:
 			} else {
 				Logger.Printf("sank Event: %v", event)
 			}
-			keepAliveTimer.Reset(sink.keepAliveTime)
-
 		case <-keepAliveTimer.C:
 			if sinkErr = sink.keepAlive(); sinkErr != nil {
 				break sinkLoop
 			}
 		}
+		keepAliveTimer.Reset(sink.keepAliveTime)
 	}
 	sink.closeFeed()
 	return sinkErr
@@ -165,7 +164,7 @@ func (sink *EventSink) sinkEvent(event SinkEvent) error {
 
 func (sink *EventSink) keepAlive() error {
 	_, err := sink.w.Write(keepAlive)
-	if err != nil {
+	if err == nil {
 		sink.flusher.Flush()
 	}
 	return err
