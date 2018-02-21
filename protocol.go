@@ -96,7 +96,8 @@ func (decoder *eventStreamReader) decode(events chan<- *Event) error {
 			// Collect the characters on the line before the first
 			// U+003A COLON character (:), and let _field_ be that
 			// string.
-			field := token
+			field := make([]byte, len(token))
+			copy(field, token)
 
 			// Collect the characters on the line after the first
 			// U+003A COLON character (:), and let _value_ be that
